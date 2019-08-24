@@ -100,7 +100,7 @@ func getHistory(c echo.Context) error {
 	sort.Slice(keys, func(i, j int) bool {
 		s_i, _ := strconv.Atoi(keys[i])
 		s_j, _ := strconv.Atoi(keys[j])
-		return s_i < s_j
+		return s_i > s_j
 	})
 
 	// ORDER BY id DESC LIMIT 100
