@@ -173,6 +173,11 @@ func postProfile(c echo.Context) error {
 		}
 
 		avatarName = fmt.Sprintf("%x%s", sha1.Sum(avatarData), ext)
+		err = writeFile(avatarName, avatarData)
+		if err != nil {
+			fmt.Println(err, "IN PostProfile")
+			return err
+		}
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
