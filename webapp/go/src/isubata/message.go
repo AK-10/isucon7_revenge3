@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/labstack/echo"
 )
 
@@ -95,7 +96,10 @@ func getMessage(c echo.Context) error {
 func queryHaveRead(userID, chID int64) (int64, error) {
 	mID, err := getHaveRead(userID, chID)
 	if err != nil {
-		return 0, err
+		if err == redis.ErrNil {
+			return 0, nil
+		}
+		return 0, nil
 	}
 	return mID, nil
 }
