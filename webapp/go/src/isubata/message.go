@@ -22,7 +22,7 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
 	msgs := []Message{}
 	if paginate {
-		rows, err := db.Query("SELECT m.*, u.* FROM message AS m"+
+		rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
 			"INNER JOIN user AS u ON m.user_id = u.id "+
 			"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
 			chID, limit, offset)
