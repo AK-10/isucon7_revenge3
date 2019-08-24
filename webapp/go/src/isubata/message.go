@@ -19,28 +19,50 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	return res.LastInsertId()
 }
 
-func queryMessagesWithUser(chID, lastID int64) ([]Message, error) {
+func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
 	msgs := []Message{}
-	rows, err := db.Query("SELECT m.*, u.* FROM message "+
-		"AS m INNER JOIN user AS u ON m.user_id = u.id "+
-		"WHERE m.id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
-		lastID,
-		chID)
-	if err != nil {
-		return nil, err
-	}
+	if paginate {
+		rows, err := db.Query("SELECT m.*, u.* FROM message AS m"+
+			"INNER JOIN user AS u ON m.user_id = u.id "+
+			"WHERE channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
+			chID, limit, offset)
 
-	for rows.Next() {
-		var m Message
-		var u User
-		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
-		m.User = u
-		msgs = append(msgs, m)
+
+		for rows.Next() {
+			var m Message
+			var u User
+			err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+			if err != nil {
+				return nil, err
+			}
+			m.User = u
+			msgs = append(msgs, m)
+		}
+	} else {
+		rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
+			"INNER JOIN user AS u ON m.user_id = u.id "+
+			"WHERE m.id > ? AND channel_id = ? ORDER BY m.id DESC LIMIT 100",
+			lastID,
+			chID)
+		if err != nil {
+			return nil, err
+		}
+
+		for rows.Next() {
+			var m Message
+			var u User
+			err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+			if err != nil {
+				return nil, err
+			}
+			m.User = u
+			msgs = append(msgs, m)
+		}
 	}
-	return msgs, err
+	return msgs, nil
 }
 
 func jsonifyMessageWithUser(message Message) map[string]interface{} {
@@ -101,7 +123,7 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessagesWithUser(chanID, lastID)
+	messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
 	if err != nil {
 		return err
 	}
