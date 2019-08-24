@@ -53,10 +53,19 @@ func (r *Redisful) FLUSH_ALL() error {
 	return nil
 }
 
-func (r *Redisful) Transaction(tx func()) {
-	r.Conn.Do("MULTI")
+func (r *Redisful) Transaction(tx func()) error {
+	_, err := r.Conn.Do("MULTI")
+	if err != nil {
+		return err
+	}
+
 	tx()
-	r.Conn.Do("EXEC")
+
+	_, err = r.Conn.Do("EXEC")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // =====================
@@ -125,6 +134,17 @@ func (r *Redisful) DecrementDataInCache(key string) error {
 
 func (r *Redisful) GetListFromCache(key string) ([]byte, error) {
 	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, 0, -1))
+	if err != nil {
+		return nil, err
+	}
+	str := strings.Join(strs[:], ",")
+	str = "[" + str + "]"
+
+	return []byte(str), err
+}
+
+func (r *Redisful) GetListLangeFromCache(key string, start, end int) ([]byte, error) {
+	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, start, end))
 	if err != nil {
 		return nil, err
 	}
@@ -281,6 +301,17 @@ func (r *Redisful) GetHashLengthInCache(key string) (int64, error) {
 		return 0, err
 	}
 	return count.(int64), nil
+}
+
+func (r *Redisful) GetHashKeysInCache(key string) ([]string, error) {
+	data, err := redis.Strings(r.Conn.Do("HKEYS", key))
+	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
+		return []string{}, err
+	}
+	return data, nil
 }
 
 // ===================

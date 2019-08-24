@@ -91,6 +91,12 @@ func getInitialize(c echo.Context) error {
 		return err
 	}
 
+	err = initMessages()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
 	return c.String(204, "")
 }
 

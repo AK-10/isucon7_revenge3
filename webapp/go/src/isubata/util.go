@@ -86,3 +86,32 @@ func initializeImagesInDB() error {
 	}
 	return nil
 }
+
+func getLastNArray(arr []string, n int) []string {
+	var length int
+	length = len(arr)
+	ans := make([]string, 0, n)
+	if length > n {
+		index := length - 1
+		for i := 0; i < n; i++ {
+			ans = append(ans, arr[index])
+			index--
+		}
+	} else {
+		for i := length - 1; i >= 0; i-- {
+			ans = append(ans, arr[i])
+		}
+	}
+	return ans
+}
+
+func selectStringArray(arr []string, lastID int64, f func(string, int) bool) []string {
+	ans := make([]string, 0)
+	i := int(lastID)
+	for _, x := range arr {
+		if f(x, i) == true {
+			ans = append(ans, x)
+		}
+	}
+	return ans
+}

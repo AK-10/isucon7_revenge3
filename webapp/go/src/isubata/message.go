@@ -1,12 +1,19 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/labstack/echo"
+)
+
+const (
+	M_LAST_ID = "M-ID"
+	M_ID_KEY  = "M-CH-ID"
 )
 
 func addMessage(channelID, userID int64, content string) (int64, error) {
@@ -19,11 +26,42 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	return res.LastInsertId()
 }
 
+// func queryMessages(chanID, lastID int64) ([]Message, error) {
+// 	msgs := []Message{}
+// 	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
+// 		lastID, chanID)
+// 	return msgs, err
+// }
+
 func queryMessages(chanID, lastID int64) ([]Message, error) {
 	msgs := []Message{}
-	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
-		lastID, chanID)
-	return msgs, err
+
+	r, err := NewRedisful()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	key := makeMessageKey(chanID)
+
+	keys, err := r.GetHashKeysInCache(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// ORDER BY id DESC LIMIT 100
+	keys = getLastNArray(keys, 100)
+	// 	WHERE id > ?
+	f := func(s string, lastID int) bool {
+		i, _ := strconv.Atoi(s)
+		return (i > lastID)
+	}
+	keys = selectStringArray(keys, lastID, f)
+	data, err := r.GetMultiFromCache(key, keys)
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(data, &msgs)
+	return msgs, nil
 }
 
 //request handlers
@@ -46,7 +84,7 @@ func postMessage(c echo.Context) error {
 		chanID = int64(x)
 	}
 
-	if _, err := addMessage(chanID, user.ID, message); err != nil {
+	if err := addMessageToCache(Message{ChannelID: chanID, UserID: user.ID, Content: message}); err != nil {
 		return err
 	}
 
@@ -145,4 +183,99 @@ func fetchUnread(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, resp)
+}
+
+func initMessages() error {
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	rows, err := db.Query("SELECT id, channel_id, user_id, content FROM message")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var lastID int64
+	for rows.Next() {
+		var m Message
+		if err = rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content); err != nil {
+			return err
+		}
+		lastID = m.ID
+		r.SetHashToCache(makeMessageKey(m.ChannelID), makeMessageField(m.ID), m)
+	}
+	r.SetDataToCache(M_LAST_ID, lastID)
+	return nil
+}
+
+func makeMessageField(id int64) string {
+	return fmt.Sprintf("%d", id)
+}
+
+func makeMessageKey(chID int64) string {
+	return fmt.Sprintf("%s-%d", M_ID_KEY, chID)
+}
+
+func addMessageToCache(m Message) error {
+	key := makeMessageKey(m.ChannelID)
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+	data, err := r.GetDataFromCache(M_LAST_ID)
+	if err != nil {
+		return err
+	}
+	var lastID int64
+	json.Unmarshal(data, &lastID)
+	m.ID = lastID
+	err = r.Transaction(func() {
+		r.SetHashToCache(key, makeMessageField(lastID), m)
+		r.IncrementDataInCache(M_LAST_ID)
+	})
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getMessageCount(chID int64) (int, error) {
+	r, err := NewRedisful()
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+	data, err := r.GetHashLengthInCache(makeMessageKey(chID))
+	if err != nil {
+		return 0, err
+	}
+	return int(data), nil
+}
+
+func getMultiMessageCount(chID, lastID int64) (int, error) {
+	r, err := NewRedisful()
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	key := makeMessageKey(chID)
+	keys, err := r.GetHashKeysInCache(key)
+	if err != nil {
+		return 0, err
+	}
+
+	// 	WHERE id > ?
+	f := func(s string, lastID int) bool {
+		i, _ := strconv.Atoi(s)
+		return (i > lastID)
+	}
+	keys = selectStringArray(keys, lastID, f)
+
+	return len(keys), nil
 }
