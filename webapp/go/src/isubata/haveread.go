@@ -27,7 +27,7 @@ func initHaveRead() error {
 			return err
 		}
 		field := makeHaveReadField(h.UserID, h.ChannelID)
-		r.SetHashToCache(HAVE_READ_KEY, field, h)
+		r.SetHashToCache(HAVE_READ_KEY, field, h.MessageID)
 	}
 	return nil
 }
@@ -43,7 +43,7 @@ func setHaveRead(h HaveRead) error {
 	}
 	defer r.Close()
 	field := makeHaveReadField(h.UserID, h.ChannelID)
-	err = r.SetHashToCache(HAVE_READ_KEY, field, h)
+	err = r.SetHashToCache(HAVE_READ_KEY, field, h.MessageID)
 	if err != nil {
 		return err
 	}
