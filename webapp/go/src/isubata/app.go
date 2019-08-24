@@ -82,6 +82,12 @@ func getInitialize(c echo.Context) error {
 		fmt.Println(err)
 		return err
 	}
+	err = initHaveRead()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
 	return c.String(204, "")
 }
 
