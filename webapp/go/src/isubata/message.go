@@ -90,7 +90,7 @@ func postMessage(c echo.Context) error {
 		chanID = int64(x)
 	}
 
-	if err := addMessageToCache(Message{ChannelID: chanID, UserID: user.ID, Content: message}); err != nil {
+	if err := addMessageToCache(Message{ChannelID: chanID, UserID: user.ID, Content: message, CreatedAt: time.Now()}); err != nil {
 		return err
 	}
 
@@ -202,7 +202,7 @@ func initMessages() error {
 	}
 	defer r.Close()
 
-	rows, err := db.Query("SELECT id, channel_id, user_id, content FROM message")
+	rows, err := db.Query("SELECT * FROM message")
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func initMessages() error {
 	var lastID int64
 	for rows.Next() {
 		var m Message
-		if err = rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content); err != nil {
+		if err = rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt); err != nil {
 			return err
 		}
 		lastID = m.ID
