@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/json"
+
 	"net/http"
 	"strconv"
 	"time"
@@ -9,6 +11,82 @@ import (
 	"github.com/labstack/echo"
 )
 
+const (
+	messageCountPrefix = "MESSAGE-NUM-CHANNEL-"
+)
+
+func makeMessageCountKey(chID int64) string {
+	return messageCountPrefix + strconv.FormatInt(chID, 10)
+}
+
+func initMessageCountCache() error {
+	type MessageCounter struct {
+		ChannelID int64
+		Count     int64
+	}
+	rows, err := db.Query("SELECT channel_id, COUNT(*) FROM message GROUP BY channel_id")
+	if err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		var mc MessageCounter
+		if err = rows.Scan(&mc.ChannelID, &mc.Count); err != nil {
+			return err
+		}
+		if err = setMessageCountToCache(mc.ChannelID, mc.Count); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func setMessageCountToCache(chID, num int64) error {
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	key := makeMessageCountKey(chID)
+	if err = r.SetDataToCache(key, num); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getMessageCountFromCache(chID int64) (int64, error) {
+	r, err := NewRedisful()
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	key := makeMessageCountKey(chID)
+	var count int64
+	data, err := r.GetDataFromCache(key)
+	if err != nil {
+		return 0, err
+	}
+	json.Unmarshal(data, &count)
+
+	return count, nil
+}
+
+func incrementMessageCount(chID int64) error {
+	r, err := NewRedisful()
+	if err != nil {
+		return nil
+	}
+	defer r.Close()
+	key := makeMessageCountKey(chID)
+	err = r.IncrementDataInCache(key)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func addMessage(channelID, userID int64, content string) (int64, error) {
 	res, err := db.Exec(
 		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
@@ -16,6 +94,10 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if err = incrementMessageCount(channelID); err != nil {
+		return 0, err
+	}
+
 	return res.LastInsertId()
 }
 
@@ -183,12 +265,13 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
-				chID)
-		}
-		if err != nil {
-			return err
+			cnt, err = getMessageCountFromCache(chID)
+			if err != nil {
+				err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
+				if err != nil {
+					return err
+				}
+			}
 		}
 		r := map[string]interface{}{
 			"channel_id": chID,

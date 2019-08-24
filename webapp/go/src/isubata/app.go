@@ -69,7 +69,6 @@ func init() {
 }
 
 // request handlers
-
 func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM user WHERE id > 1000")
 	db.MustExec("DELETE FROM image WHERE id > 1001")
@@ -83,6 +82,10 @@ func getInitialize(c echo.Context) error {
 	err = initializeImagesInDB()
 	if err != nil {
 		fmt.Println(err)
+		return err
+	}
+	// init messageCount for cache
+	if err := initMessageCountCache(); err != nil {
 		return err
 	}
 	err = initHaveRead()
