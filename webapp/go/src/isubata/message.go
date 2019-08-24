@@ -16,15 +16,15 @@ const (
 	M_ID_KEY  = "M-CH-ID"
 )
 
-func addMessage(channelID, userID int64, content string) (int64, error) {
-	res, err := db.Exec(
-		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
-		channelID, userID, content)
-	if err != nil {
-		return 0, err
-	}
-	return res.LastInsertId()
-}
+// func addMessage(channelID, userID int64, content string) (int64, error) {
+// 	res, err := db.Exec(
+// 		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
+// 		channelID, userID, content)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	return res.LastInsertId()
+// }
 
 // func queryMessages(chanID, lastID int64) ([]Message, error) {
 // 	msgs := []Message{}
@@ -165,13 +165,17 @@ func fetchUnread(c echo.Context) error {
 
 		var cnt int64
 		if lastID > 0 {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
-				chID, lastID)
+			count, err := getMultiMessageCount(chID, lastID)
+			if err != nil {
+				return err
+			}
+			cnt = int64(count)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
-				chID)
+			count, err := getMessageCount(chID)
+			if err != nil {
+				return err
+			}
+			cnt = int64(count)
 		}
 		if err != nil {
 			return err
