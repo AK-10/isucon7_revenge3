@@ -21,6 +21,7 @@ type Message struct {
 	UserID    int64     `db:"user_id"`
 	Content   string    `db:"content"`
 	CreatedAt time.Time `db:"created_at"`
+	User      User
 }
 
 type ChannelInfo struct {

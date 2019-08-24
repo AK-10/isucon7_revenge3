@@ -19,6 +19,40 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	return res.LastInsertId()
 }
 
+func queryMessagesWithUser(chID, lastID int64) ([]Message, error) {
+	msgs := []Message{}
+	rows, err := db.Query("SELECT m.*, u.* FROM message "+
+		"AS m INNER JOIN user AS u ON m.user_id = u.id "+
+		"WHERE m.id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
+		lastID,
+		chID)
+	if err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+		var m Message
+		var u User
+		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		m.User = u
+		msgs = append(msgs, m)
+	}
+	return msgs, err
+}
+
+func jsonifyMessageWithUser(message Message) map[string]interface{} {
+	r := make(map[string]interface{})
+	r["id"] = message.ID
+	r["user"] = message.User
+	r["date"] = message.CreatedAt.Format("2006/01/02 15:04:05")
+	r["content"] = message.Content
+
+	return r
+}
+
 func queryMessages(chanID, lastID int64) ([]Message, error) {
 	msgs := []Message{}
 	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
@@ -27,7 +61,6 @@ func queryMessages(chanID, lastID int64) ([]Message, error) {
 }
 
 //request handlers
-
 func postMessage(c echo.Context) error {
 	user, err := ensureLogin(c)
 	if user == nil {
@@ -68,7 +101,7 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessages(chanID, lastID)
+	messages, err := queryMessagesWithUser(chanID, lastID)
 	if err != nil {
 		return err
 	}
@@ -76,10 +109,7 @@ func getMessage(c echo.Context) error {
 	response := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
 		m := messages[i]
-		r, err := jsonifyMessage(m)
-		if err != nil {
-			return err
-		}
+		r := jsonifyMessageWithUser(m)
 		response = append(response, r)
 	}
 
