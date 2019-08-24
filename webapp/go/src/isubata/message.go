@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -42,11 +43,17 @@ func queryMessages(chanID, lastID int64) ([]Message, error) {
 	}
 	defer r.Close()
 	key := makeMessageKey(chanID)
-
 	keys, err := r.GetHashKeysInCache(key)
 	if err != nil {
 		return nil, err
 	}
+
+	// sort
+	sort.Slice(keys, func(i, j int) bool {
+		s_i, _ := strconv.Atoi(keys[i])
+		s_j, _ := strconv.Atoi(keys[j])
+		return s_i < s_j
+	})
 
 	// ORDER BY id DESC LIMIT 100
 	keys = getLastNArray(keys, 100)
