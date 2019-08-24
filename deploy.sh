@@ -28,6 +28,10 @@ sudo sh -c 'echo "" > /var/log/mysql/slow.log'
 ## replace mysql conf
 sudo cp conf/mysqld.cnf /etc/mysql/mysql.conf.d/mysqld.cnf
 
+## replace redis conf
+sudo cp conf/redis.conf /etc/redis/redis.conf
+sudo chown redis:redis /etc/redis/redis.conf
+
 ## restart application services
 ## db, app, nginx, redis
 echo 'systemctl are restarting...'
