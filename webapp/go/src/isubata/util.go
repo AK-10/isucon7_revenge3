@@ -1,10 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 
 	"github.com/labstack/echo"
+)
+
+const (
+	ICONS_PATH = "/home/isucon/isubata/webapp/public/icons/"
 )
 
 func jsonifyMessage(m Message) (map[string]interface{}, error) {
@@ -49,4 +55,34 @@ func tRange(a, b int64) []int64 {
 		r[i] = a + i
 	}
 	return r
+}
+
+func writeFile(filename string, data []byte) error {
+	filepath := ICONS_PATH + filename
+	err := ioutil.WriteFile(filepath, data, 0644)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func initializeImagesInDB() error {
+	rows, err := db.Query("SELECT name, data FROM image")
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		var data []byte
+		if err := rows.Scan(&name, &data); err != nil {
+			return err
+		}
+		err = writeFile(name, data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

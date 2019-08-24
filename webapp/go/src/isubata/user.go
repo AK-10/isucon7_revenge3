@@ -171,53 +171,34 @@ func postProfile(c echo.Context) error {
 		if len(avatarData) > avatarMaxBytes {
 			return ErrBadReqeust
 		}
-
 		avatarName = fmt.Sprintf("%x%s", sha1.Sum(avatarData), ext)
 	}
 
 	if avatarName != "" && len(avatarData) > 0 {
-		_, err := db.Exec("INSERT INTO image (name, data) VALUES (?, ?)", avatarName, avatarData)
+		err = writeFile(avatarName, avatarData)
 		if err != nil {
+			fmt.Println(err, "IN PostProfile")
 			return err
 		}
-		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
-		if err != nil {
-			return err
-		}
-	}
 
-	if name := c.FormValue("display_name"); name != "" {
+		if name := c.FormValue("display_name"); name != "" {
+			_, err := db.Exec("UPDATE user SET display_name = ?, avatar_icon = ? WHERE id = ?", name, avatarName, self.ID)
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
+			if err != nil {
+				return err
+			}
+		}
+	} else if name := c.FormValue("display_name"); name != "" {
 		_, err := db.Exec("UPDATE user SET display_name = ? WHERE id = ?", name, self.ID)
 		if err != nil {
 			return err
 		}
+
 	}
 
 	return c.Redirect(http.StatusSeeOther, "/")
-}
-
-func getIcon(c echo.Context) error {
-	var name string
-	var data []byte
-	err := db.QueryRow("SELECT name, data FROM image WHERE name = ?",
-		c.Param("file_name")).Scan(&name, &data)
-	if err == sql.ErrNoRows {
-		return echo.ErrNotFound
-	}
-	if err != nil {
-		return err
-	}
-
-	mime := ""
-	switch true {
-	case strings.HasSuffix(name, ".jpg"), strings.HasSuffix(name, ".jpeg"):
-		mime = "image/jpeg"
-	case strings.HasSuffix(name, ".png"):
-		mime = "image/png"
-	case strings.HasSuffix(name, ".gif"):
-		mime = "image/gif"
-	default:
-		return echo.ErrNotFound
-	}
-	return c.Blob(http.StatusOK, mime, data)
 }
