@@ -212,12 +212,13 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?",
-				chID)
-		}
-		if err != nil {
-			return err
+			cnt, err = getMessageCountFromCache(chID)
+			if err != nil {
+				err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
+				if err != nil {
+					return err
+				}
+			}
 		}
 		r := map[string]interface{}{
 			"channel_id": chID,
