@@ -58,9 +58,8 @@ func queryMessages(chanID, lastID int64) ([]Message, error) {
 	// ORDER BY id DESC LIMIT 100
 	keys = getLastNArray(keys, 100)
 	// 	WHERE id > ?
-	f := func(s string, lastID int) bool {
-		i, _ := strconv.Atoi(s)
-		return (i > lastID)
+	f := func(id, lastID int) bool {
+		return (id > lastID)
 	}
 	keys = selectStringArray(keys, lastID, f)
 	data, err := r.GetMultiFromCache(key, keys)
@@ -282,9 +281,8 @@ func getMultiMessageCount(chID, lastID int64) (int, error) {
 	}
 
 	// 	WHERE id > ?
-	f := func(s string, lastID int) bool {
-		i, _ := strconv.Atoi(s)
-		return (i > lastID)
+	f := func(id, lastID int) bool {
+		return (id > lastID)
 	}
 	keys = selectStringArray(keys, lastID, f)
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	"math/rand"
+	"strconv"
 
 	"github.com/labstack/echo"
 )
@@ -105,11 +106,12 @@ func getLastNArray(arr []string, n int) []string {
 	return ans
 }
 
-func selectStringArray(arr []string, lastID int64, f func(string, int) bool) []string {
+func selectStringArray(arr []string, lastID int64, f func(int, int) bool) []string {
 	ans := make([]string, 0)
 	i := int(lastID)
 	for _, x := range arr {
-		if f(x, i) == true {
+		id, _ := strconv.Atoi(x)
+		if f(id, i) == true {
 			ans = append(ans, x)
 		}
 	}
