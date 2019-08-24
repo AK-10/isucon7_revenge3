@@ -2,12 +2,89 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/labstack/echo"
 )
+
+const (
+	messageCountPrefix = "MESSAGE-NUM-CHANNEL-"
+)
+
+func makeMessageCountKey(chID int64) string {
+	return messageCountPrefix + strconv.FormatInt(chID, 10)
+}
+
+func initMessageCountCache() error {
+	type MessageCounter struct {
+		ChannelID int64
+		Count     int64
+	}
+	rows, err := db.Query("SELECT channel_id, COUNT(*) FROM message GROUP BY channel_id")
+	if err != nil {
+		return err
+	}
+
+	for rows.Next() {
+		var mc MessageCounter
+		if err = rows.Scan(&mc.ChannelID, &mc.Count); err != nil {
+			return err
+		}
+		if err = setMessageCountToCache(mc.ChannelID, mc.Count); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func setMessageCountToCache(chID, num int64) error {
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	key := makeMessageCountKey(chID)
+	if err = r.SetDataToCache(key, num); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getMessageCountFromCache(chID int64) (int64, error) {
+	r, err := NewRedisful()
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	key := makeMessageCountKey(chID)
+	var count int64
+	data, err := r.GetDataFromCache(key)
+	if err != nil {
+		return 0, err
+	}
+	json.Unmarshal(data, &count)
+
+	return count, nil
+}
+
+func incrementMessageCount(chID int64) error {
+	r, err := NewRedisful()
+	if err != nil {
+		return nil
+	}
+	defer r.Close()
+	key := makeMessageCountKey(chID)
+	err = r.IncrementDataInCache(key)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
 func addMessage(channelID, userID int64, content string) (int64, error) {
 	res, err := db.Exec(
@@ -16,6 +93,10 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
+	if err = incrementMessageCount(channelID); err != nil {
+		return 0, err
+	}
+
 	return res.LastInsertId()
 }
 
@@ -27,7 +108,6 @@ func queryMessages(chanID, lastID int64) ([]Message, error) {
 }
 
 //request handlers
-
 func postMessage(c echo.Context) error {
 	user, err := ensureLogin(c)
 	if user == nil {
