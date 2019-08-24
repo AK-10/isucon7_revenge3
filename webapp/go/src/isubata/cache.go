@@ -269,6 +269,9 @@ func (r *Redisful) GetAllHashFromCache(key string) ([]byte, error) {
 
 func (r *Redisful) GetMultiFromCache(key string, fields []string) ([]byte, error) {
 	// conn.Doの引数に合うように変換
+	if len(fields) == 0 {
+		return nil, nil
+	}
 	querys := make([]interface{}, 0, len(fields)+1)
 	querys = append(querys, key)
 	for i := range fields {

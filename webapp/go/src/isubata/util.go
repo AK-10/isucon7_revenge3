@@ -128,10 +128,10 @@ func getFirstNArray(arr []string, n, offset int) []string {
 		return nil
 	}
 	ans := make([]string, 0, n)
-	if length > n {
-		ans = append(ans, arr[(offset):n]...)
+	if length > (offset + n) {
+		ans = append(ans, arr[offset:n+offset]...)
 	} else {
-		ans = append(ans, arr[(offset):(length+1)]...)
+		ans = append(ans, arr[offset:]...)
 	}
 	return ans
 }
