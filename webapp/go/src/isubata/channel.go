@@ -93,6 +93,9 @@ func getHistory(c echo.Context) error {
 	defer r.Close()
 	key := makeMessageKey(chID)
 	keys, err := r.GetHashKeysInCache(key)
+	if keys == nil {
+		keys = []string{}
+	}
 	if err != nil {
 		return err
 	}
