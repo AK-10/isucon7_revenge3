@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"sort"
+
 	"fmt"
 	"net/http"
 	"strconv"
@@ -68,10 +71,11 @@ func getHistory(c echo.Context) error {
 
 	const N = 20
 	var cnt int64
-	err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
+	count, err := getMessageCount(chID)
 	if err != nil {
 		return err
 	}
+	cnt = int64(count)
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
 		maxPage = 1
@@ -81,12 +85,36 @@ func getHistory(c echo.Context) error {
 	}
 
 	messages := []Message{}
-	err = db.Select(&messages,
-		"SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
-		chID, N, (page-1)*N)
+
+	r, err := NewRedisful()
 	if err != nil {
 		return err
 	}
+	defer r.Close()
+	key := makeMessageKey(chID)
+	keys, err := r.GetHashKeysInCache(key)
+	if err != nil {
+		return err
+	}
+	// sort
+	sort.Slice(keys, func(i, j int) bool {
+		s_i, _ := strconv.Atoi(keys[i])
+		s_j, _ := strconv.Atoi(keys[j])
+		return s_i < s_j
+	})
+
+	// ORDER BY id DESC LIMIT 100
+	keys = getFirstNArray(keys, N, int((page-1)*N))
+	// 	WHERE id > ?
+
+	// err = db.Select(&messages,
+	// 	"SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
+	// 	chID, N, (page-1)*N)
+	data, err := r.GetMultiFromCache(key, keys)
+	if err != nil {
+		return err
+	}
+	json.Unmarshal(data, &messages)
 
 	mjson := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {

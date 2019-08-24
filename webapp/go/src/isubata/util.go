@@ -117,3 +117,21 @@ func selectStringArray(arr []string, lastID int64, f func(int, int) bool) []stri
 	}
 	return ans
 }
+
+func getFirstNArray(arr []string, n, offset int) []string {
+	if offset < 0 {
+		return nil
+	}
+	var length int
+	length = len(arr)
+	if (length - offset) < 0 {
+		return nil
+	}
+	ans := make([]string, 0, n)
+	if length > n {
+		ans = append(ans, arr[(offset):n]...)
+	} else {
+		ans = append(ans, arr[(offset):(length+1)]...)
+	}
+	return ans
+}
