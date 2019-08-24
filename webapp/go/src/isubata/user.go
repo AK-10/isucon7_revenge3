@@ -171,31 +171,33 @@ func postProfile(c echo.Context) error {
 		if len(avatarData) > avatarMaxBytes {
 			return ErrBadReqeust
 		}
-
 		avatarName = fmt.Sprintf("%x%s", sha1.Sum(avatarData), ext)
+	}
+
+	if avatarName != "" && len(avatarData) > 0 {
 		err = writeFile(avatarName, avatarData)
 		if err != nil {
 			fmt.Println(err, "IN PostProfile")
 			return err
 		}
-	}
 
-	if avatarName != "" && len(avatarData) > 0 {
-		_, err := db.Exec("INSERT INTO image (name, data) VALUES (?, ?)", avatarName, avatarData)
-		if err != nil {
-			return err
+		if name := c.FormValue("display_name"); name != "" {
+			_, err := db.Exec("UPDATE user SET display_name = ?, avatar_icon = ? WHERE id = ?", name, avatarName, self.ID)
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
+			if err != nil {
+				return err
+			}
 		}
-		_, err = db.Exec("UPDATE user SET avatar_icon = ? WHERE id = ?", avatarName, self.ID)
-		if err != nil {
-			return err
-		}
-	}
-
-	if name := c.FormValue("display_name"); name != "" {
+	} else if name := c.FormValue("display_name"); name != "" {
 		_, err := db.Exec("UPDATE user SET display_name = ? WHERE id = ?", name, self.ID)
 		if err != nil {
 			return err
 		}
+
 	}
 
 	return c.Redirect(http.StatusSeeOther, "/")
