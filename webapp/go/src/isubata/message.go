@@ -24,7 +24,7 @@ func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int6
 	if paginate {
 		rows, err := db.Query("SELECT m.*, u.* FROM message AS m"+
 			"INNER JOIN user AS u ON m.user_id = u.id "+
-			"WHERE channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
+			"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
 			chID, limit, offset)
 
 		if err != nil {
@@ -44,7 +44,7 @@ func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int6
 	} else {
 		rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
 			"INNER JOIN user AS u ON m.user_id = u.id "+
-			"WHERE m.id > ? AND channel_id = ? ORDER BY m.id DESC LIMIT 100",
+			"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
 			lastID,
 			chID)
 		if err != nil {
