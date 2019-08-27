@@ -26,10 +26,10 @@ func makeMessageCountKey(chID int64) string {
 }
 
 // ここで渡されるmessagesのidは降順のはず
-func getMessagesToLastID(messages []Message, lastID int64) []Message {
+func getMessagesTillLastID(messages []Message, lastID int64) []Message {
 	var msgs = []Message{}
 	for i, msg := range messages {
-		if lastID <= msg.ID || i == 100 {
+		if lastID >= msg.ID || i == 100 {
 			break
 		}
 		msgs = append(msgs, msg)
@@ -58,7 +58,7 @@ func BinarySearchAboutLastId(left, right int, lastID int64, messages []Message) 
 	return len(messages)
 }
 
-func initMessageToCache() error {
+func initMessagesToCache() error {
 	chIDs := []int64{}
 	err := db.Select(&chIDs, "SELECT id FROM channel")
 	if err != nil {
@@ -205,8 +205,8 @@ func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, of
 		if err != nil {
 			return nil, err
 		}
-		json.Unmarshal(data, messages)
-		msgs = getMessagesToLastID(messages, lastID)
+		json.Unmarshal(data, &messages)
+		msgs = getMessagesTillLastID(messages, lastID)
 	}
 	if err != nil {
 		return nil, err
@@ -304,8 +304,8 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
-	//messages, err := queryMessagesWithUserFromCache(chanID, lastID, false, 0, 0)
+	//messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
+	messages, err := queryMessagesWithUserFromCache(chanID, lastID, false, 0, 0)
 	if err != nil {
 		return err
 	}

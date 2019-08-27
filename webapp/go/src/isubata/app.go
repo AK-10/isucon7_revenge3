@@ -85,7 +85,7 @@ func getInitialize(c echo.Context) error {
 		return err
 	}
 	// initial messages to cache
-	if err := initMessageToCache(); err != nil {
+	if err := initMessagesToCache(); err != nil {
 		fmt.Println("Failed to init Message Cache!!")
 		fmt.Println(err)
 		return err

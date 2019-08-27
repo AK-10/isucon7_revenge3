@@ -129,7 +129,8 @@ func (r *Redisful) GetListFromCacheWithLimitOffset(key string, limit, offset int
 	if err != nil {
 		return nil, err
 	}
-	str := "[" + strings.Join(strs[:], ",") + "]"
+	str := strings.Join(strs[:], ",")
+	str = "[" + str + "]"
 	return []byte(str), err
 }
 
