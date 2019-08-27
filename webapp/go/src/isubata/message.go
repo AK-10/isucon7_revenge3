@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -33,8 +32,6 @@ func initMessageToCache() error {
 	}
 	for _, chID := range chIDs {
 		msgs := []Message{}
-		fmt.Println("chID: ")
-		fmt.Println(chID)
 		err := db.Select(&msgs, "SELECT * FROM message WHERE channel_id = ? ORDER BY id", chID)
 		if err != nil {
 			return err
