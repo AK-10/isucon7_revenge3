@@ -32,13 +32,22 @@ func initMessageToCache() error {
 		return err
 	}
 	for _, chID := range chIDs {
-		msgs := []Message{}
-		err := db.Select(&msgs, "SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC", chID)
+		rows, err := db.Query("SELECT m.*, u.* FROM message AS m INNER JOIN user AS u ON m.user_id = u.id WHERE channel_id = ? ORDER BY id", chID)
 		if err != nil {
 			return err
 		}
-		for _, msg := range msgs {
-			if err = addMessageToCache(chID, msg); err != nil {
+
+		for rows.Next() {
+			var (
+				m Message
+				u User
+			)
+			err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+			if err != nil {
+				return err
+			}
+			m.User = u
+			if err = addMessageToCache(chID, m); err != nil {
 				return err
 			}
 		}
@@ -54,7 +63,7 @@ func addMessageToCache(chID int64, msg Message) error {
 	defer r.Close()
 
 	key := makeMessageKey(chID)
-	if err = r.RPushListToCache(key, msg); err != nil {
+	if err = r.LPushListToCache(key, msg); err != nil {
 		return err
 	}
 	return nil
@@ -140,6 +149,21 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	}
 
 	return res.LastInsertId()
+}
+func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
+	r, err := NewRedisful()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	var msgs []Message
+	if paginate {
+
+	} else {
+
+	}
+	return msgs, nil
 }
 
 func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
@@ -250,7 +274,6 @@ func getMessage(c echo.Context) error {
 			return err
 		}
 	}
-
 	return c.JSON(http.StatusOK, response)
 }
 

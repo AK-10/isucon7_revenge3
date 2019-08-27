@@ -124,6 +124,15 @@ func (r *Redisful) DecrementDataInCache(key string) error {
 // 			List 型
 // ===========================
 
+func (r *Redisful) GetListFromCacheWithLimitOffset(key string, limit, offset int64) ([]byte, error) {
+	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, offset, offset+limit))
+	if err != nil {
+		return nil, err
+	}
+	str := "[" + strings.Join(strs[:], ",") + "]"
+	return []byte(str), err
+}
+
 func (r *Redisful) GetListFromCache(key string) ([]byte, error) {
 	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, 0, -1))
 	if err != nil {

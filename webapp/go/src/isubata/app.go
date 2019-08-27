@@ -94,11 +94,6 @@ func getInitialize(c echo.Context) error {
 	if err := initMessageCountCache(); err != nil {
 		return err
 	}
-	err = initHaveRead()
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
 
 	return c.String(204, "")
 }
