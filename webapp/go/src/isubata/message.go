@@ -26,8 +26,20 @@ func makeMessageCountKey(chID int64) string {
 }
 
 // ここで渡されるmessagesのidは降順のはず
+func getMessagesToLastID(messages []Message, lastID int64) []Message {
+	var msgs = []Message{}
+	for i, msg := range messages {
+		if lastID <= msg.ID || i == 100 {
+			break
+		}
+		msgs = append(msgs, msg)
+	}
+	return msgs
+}
+
+// ここで渡されるmessagesのidは降順のはず
 func BinarySearchAboutLastId(left, right int, lastID int64, messages []Message) int {
-	if messages[left].ID < lastID || messages[right-1].ID > lastID {
+	if messages[left].ID < lastID || messages[right].ID > lastID {
 		return len(messages)
 	}
 	for left < right {
@@ -194,8 +206,7 @@ func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, of
 			return nil, err
 		}
 		json.Unmarshal(data, messages)
-		lastIDIdx := BinarySearchAboutLastId(0, len(messages), lastID, messages)
-		msgs = messages[:lastIDIdx]
+		msgs = getMessagesToLastID(messages, lastID)
 	}
 	if err != nil {
 		return nil, err
