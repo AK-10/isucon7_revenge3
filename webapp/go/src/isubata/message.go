@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	totalMessagePrefix = "TOTAL-MESSAGE-NUM"
 	messagePrefix      = "MESSAGE-CHANNEL-"
 	messageCountPrefix = "MESSAGE-NUM-CHANNEL-"
 )
@@ -56,6 +57,52 @@ func BinarySearchAboutLastId(left, right int, lastID int64, messages []Message) 
 		return left
 	}
 	return len(messages)
+}
+
+func initTotalMessageCount() error {
+	var cnt int64
+	err := db.Get(&cnt, "SELECT COUNT(*) FROM message")
+	if err != nil {
+		return err
+	}
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	if err := r.SetDataToCache(totalMessagePrefix, cnt); err != nil {
+		return err
+	}
+	return nil
+}
+
+func getTotalMessageCountFromCache() (int64, error) {
+	r, err := NewRedisful()
+	if err != nil {
+		return 0, err
+	}
+	defer r.Close()
+
+	var count int64
+	data, err := r.GetDataFromCache(totalMessagePrefix)
+	if err != nil {
+		return 0, err
+	}
+	json.Unmarshal(data, &count)
+
+	return count, nil
+}
+
+func incrementTotalMessageCount() error {
+	r, err := NewRedisful()
+	if err != nil {
+		return nil
+	}
+	defer r.Close()
+	err = r.IncrementDataInCache(totalMessagePrefix)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func initMessagesToCache() error {
@@ -177,9 +224,6 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err = incrementMessageCount(channelID); err != nil {
-		return 0, err
-	}
 
 	return res.LastInsertId()
 }
@@ -280,10 +324,23 @@ func postMessage(c echo.Context) error {
 	if _, err := addMessage(chanID, user.ID, message); err != nil {
 		return err
 	}
+	totalMessageNum, err := getTotalMessageCountFromCache()
+	if err != nil {
+		return err
+	}
+
 	// set to cache
-	msg := Message{ChannelID: chanID, UserID: user.ID, Content: message, CreatedAt: time.Now(), User: *user}
+	msg := Message{ID: totalMessageNum + 1, ChannelID: chanID, UserID: user.ID, Content: message, CreatedAt: time.Now(), User: *user}
 	if err := addMessageToCache(chanID, msg); err != nil {
-		return nil
+		return err
+	}
+
+	if err := incrementTotalMessageCount(); err != nil {
+		return err
+	}
+
+	if err = incrementMessageCount(chanID); err != nil {
+		return err
 	}
 
 	return c.NoContent(204)
@@ -304,8 +361,8 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	//messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
-	messages, err := queryMessagesWithUserFromCache(chanID, lastID, false, 0, 0)
+	messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
+	//messages, err := queryMessagesWithUserFromCache(chanID, lastID, false, 0, 0)
 	if err != nil {
 		return err
 	}

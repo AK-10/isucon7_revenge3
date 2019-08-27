@@ -90,6 +90,10 @@ func getInitialize(c echo.Context) error {
 		fmt.Println(err)
 		return err
 	}
+	// init total message count to cache
+	if err := initTotalMessageCount(); err != nil {
+		return err
+	}
 	// init messageCount for cache
 	if err := initMessageCountCache(); err != nil {
 		return err
