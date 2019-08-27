@@ -32,7 +32,7 @@ func initMessageToCache() error {
 	}
 	for _, chID := range chIDs {
 		msgs := []Message{}
-		err := db.Select(&msgs, "SELECT * FROM message channel_id = ? ORDER BY id", chID)
+		err := db.Select(&msgs, "SELECT * FROM message WHERE channel_id = ? ORDER BY id", chID)
 		if err != nil {
 			return err
 		}
