@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"database/sql"
 	"github.com/gomodule/redigo/redis"
 	"github.com/labstack/echo"
 )
@@ -258,39 +257,39 @@ func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, of
 	return msgs, nil
 }
 
-func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
-	msgs := []Message{}
-	var (
-		rows *sql.Rows
-		err  error
-	)
-	if paginate {
-		rows, err = db.Query("SELECT m.*, u.* FROM message AS m "+
-			"INNER JOIN user AS u ON m.user_id = u.id "+
-			"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
-			chID, limit, offset)
-	} else {
-		rows, err = db.Query("SELECT m.*, u.* FROM message AS m "+
-			"INNER JOIN user AS u ON m.user_id = u.id "+
-			"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
-			lastID,
-			chID)
-	}
-	if err != nil {
-		return nil, err
-	}
-	for rows.Next() {
-		var m Message
-		var u User
-		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
-		if err != nil {
-			return nil, err
-		}
-		m.User = u
-		msgs = append(msgs, m)
-	}
-	return msgs, nil
-}
+//func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
+//	msgs := []Message{}
+//	var (
+//		rows *sql.Rows
+//		err  error
+//	)
+//	if paginate {
+//		rows, err = db.Query("SELECT m.*, u.* FROM message AS m "+
+//			"INNER JOIN user AS u ON m.user_id = u.id "+
+//			"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
+//			chID, limit, offset)
+//	} else {
+//		rows, err = db.Query("SELECT m.*, u.* FROM message AS m "+
+//			"INNER JOIN user AS u ON m.user_id = u.id "+
+//			"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
+//			lastID,
+//			chID)
+//	}
+//	if err != nil {
+//		return nil, err
+//	}
+//	for rows.Next() {
+//		var m Message
+//		var u User
+//		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+//		if err != nil {
+//			return nil, err
+//		}
+//		m.User = u
+//		msgs = append(msgs, m)
+//	}
+//	return msgs, nil
+//}
 
 func jsonifyMessageWithUser(message Message) map[string]interface{} {
 	r := make(map[string]interface{})
@@ -321,14 +320,13 @@ func postMessage(c echo.Context) error {
 		chanID = int64(x)
 	}
 
-	if _, err := addMessage(chanID, user.ID, message); err != nil {
-		return err
-	}
+	//if _, err := addMessage(chanID, user.ID, message); err != nil {
+	//	return err
+	//}
 	totalMessageNum, err := getTotalMessageCountFromCache()
 	if err != nil {
 		return err
 	}
-
 	// set to cache
 	msg := Message{ID: totalMessageNum + 1, ChannelID: chanID, UserID: user.ID, Content: message, CreatedAt: time.Now(), User: *user}
 	if err := addMessageToCache(chanID, msg); err != nil {
@@ -361,8 +359,8 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
-	//messages, err := queryMessagesWithUserFromCache(chanID, lastID, false, 0, 0)
+	//messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
+	messages, err := queryMessagesWithUserFromCache(chanID, lastID, false, 0, 0)
 	if err != nil {
 		return err
 	}
