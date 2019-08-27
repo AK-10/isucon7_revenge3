@@ -36,15 +36,16 @@ func initMessageToCache() error {
 		if err != nil {
 			return err
 		}
-		if err = setMessageToCache(chID, msgs); err != nil {
-			return err
+		for _, msg := range msgs {
+			if err = setMessageToCache(chID, msg); err != nil {
+				return err
+			}
 		}
 	}
-
 	return nil
 }
 
-func setMessageToCache(chID int64, msgs []Message) error {
+func setMessageToCache(chID int64, msg Message) error {
 	r, err := NewRedisful()
 	if err != nil {
 		return err
@@ -52,7 +53,7 @@ func setMessageToCache(chID int64, msgs []Message) error {
 	defer r.Close()
 
 	key := makeMessageKey(chID)
-	if err = r.RPushListToCache(key, msgs); err != nil {
+	if err = r.RPushListToCache(key, msg); err != nil {
 		return err
 	}
 	return nil
@@ -196,12 +197,12 @@ func jsonifyMessageWithUser(message Message) map[string]interface{} {
 	return r
 }
 
-func queryMessages(chanID, lastID int64) ([]Message, error) {
-	msgs := []Message{}
-	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
-		lastID, chanID)
-	return msgs, err
-}
+//func queryMessages(chanID, lastID int64) ([]Message, error) {
+//	msgs := []Message{}
+//	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
+//		lastID, chanID)
+//	return msgs, err
+//}
 
 //request handlers
 func postMessage(c echo.Context) error {
