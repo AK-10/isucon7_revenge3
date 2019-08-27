@@ -91,7 +91,7 @@ func getHistory(c echo.Context) error {
 	// 	chID, N, (page-1)*N)
 
 	//messages, err := queryMessagesWithUser(chID, 0, true, N, (page-1)*N)
-	messages, err := queryMessagesWithUserFromCache(chID, 0, true, N, (page-1)*N)
+	messages, err := queryMessagesWithUserFromCache(chID, 0, true, N-1, (page-1)*N)
 	if err != nil {
 		return err
 	}
