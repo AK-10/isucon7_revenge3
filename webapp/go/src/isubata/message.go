@@ -12,11 +12,50 @@ import (
 )
 
 const (
+	messagePrefix      = "MESSAGE-CHANNEL-"
 	messageCountPrefix = "MESSAGE-NUM-CHANNEL-"
 )
 
+func makeMessageKey(chID int64) string {
+	return messagePrefix + strconv.FormatInt(chID, 10)
+}
+
 func makeMessageCountKey(chID int64) string {
 	return messageCountPrefix + strconv.FormatInt(chID, 10)
+}
+
+func initMessageToCache() error {
+	chIDs := []int64{}
+	err := db.Select(&chIDs, "SELECT id FROM channel")
+	if err != nil {
+		return err
+	}
+	for _, chID := range chIDs {
+		msgs := []Message{}
+		err := db.Select(&msgs, "SELECT * FROM message channel_id = ? ORDER BY id", chID)
+		if err != nil {
+			return err
+		}
+		if err = setMessageToCache(chID, msgs); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func setMessageToCache(chID int64, msgs []Message) error {
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	key := makeMessageKey(chID)
+	if err = r.RPushListToCache(key, msgs); err != nil {
+		return err
+	}
+	return nil
 }
 
 func initMessageCountCache() error {
