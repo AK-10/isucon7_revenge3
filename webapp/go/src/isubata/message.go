@@ -32,7 +32,7 @@ func initMessageToCache() error {
 		return err
 	}
 	for _, chID := range chIDs {
-		rows, err := db.Query("SELECT m.*, u.* FROM message AS m INNER JOIN user AS u ON m.user_id = u.id WHERE channel_id = ? ORDER BY id", chID)
+		rows, err := db.Query("SELECT m.*, u.* FROM message AS m INNER JOIN user AS u ON m.user_id = u.id WHERE channel_id = ? ORDER BY m.id", chID)
 		if err != nil {
 			return err
 		}
