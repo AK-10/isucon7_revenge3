@@ -26,10 +26,10 @@ func makeMessageCountKey(chID int64) string {
 }
 
 // ここで渡されるmessagesのidは降順のはず
-func getMessagesTillLastID(messages []Message, lastID int64) []Message {
+func getMessagesTillLastID(messages []Message, lastID int64, limit bool) []Message {
 	var msgs = []Message{}
 	for i, msg := range messages {
-		if lastID >= msg.ID || i == 100 {
+		if lastID >= msg.ID || (limit && i == 100) {
 			break
 		}
 		msgs = append(msgs, msg)
@@ -249,7 +249,7 @@ func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, of
 			return nil, err
 		}
 		json.Unmarshal(data, &messages)
-		msgs = getMessagesTillLastID(messages, lastID)
+		msgs = getMessagesTillLastID(messages, lastID, true)
 	}
 	if err != nil {
 		return nil, err
@@ -415,9 +415,22 @@ func fetchUnread(c echo.Context) error {
 
 		var cnt int64
 		if lastID > 0 {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
-				chID, lastID)
+			r, err := NewRedisful()
+			if err != nil {
+				return err
+			}
+			defer r.Close()
+
+			var messages []Message
+			key := makeMessageKey(chID)
+			data, err := r.GetListFromCache(key)
+			if err != nil {
+				return err
+			}
+			json.Unmarshal(data, &messages)
+			messages = getMessagesTillLastID(messages, lastID, false)
+			cnt = int64(len(messages))
+
 		} else {
 			cnt, err = getMessageCountFromCache(chID)
 			if err != nil {
