@@ -33,7 +33,7 @@ func initMessageToCache() error {
 	}
 	for _, chID := range chIDs {
 		msgs := []Message{}
-		err := db.Select(&msgs, "SELECT * FROM message WHERE channel_id = ? ORDER BY id", chID)
+		err := db.Select(&msgs, "SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC", chID)
 		if err != nil {
 			return err
 		}
@@ -144,8 +144,10 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 
 func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
 	msgs := []Message{}
-	var rows *sql.Rows
-	var err error
+	var (
+		rows *sql.Rows
+		err  error
+	)
 	if paginate {
 		rows, err = db.Query("SELECT m.*, u.* FROM message AS m "+
 			"INNER JOIN user AS u ON m.user_id = u.id "+
@@ -157,7 +159,6 @@ func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int6
 			"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
 			lastID,
 			chID)
-
 	}
 	if err != nil {
 		return nil, err
@@ -172,47 +173,6 @@ func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int6
 		m.User = u
 		msgs = append(msgs, m)
 	}
-	//if paginate {
-	//	rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
-	//		"INNER JOIN user AS u ON m.user_id = u.id "+
-	//		"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
-	//		chID, limit, offset)
-
-	//	if err != nil {
-	//		return nil, err
-	//	}
-
-	//	for rows.Next() {
-	//		var m Message
-	//		var u User
-	//		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		m.User = u
-	//		msgs = append(msgs, m)
-	//	}
-	//} else {
-	//	rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
-	//		"INNER JOIN user AS u ON m.user_id = u.id "+
-	//		"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
-	//		lastID,
-	//		chID)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-
-	//	for rows.Next() {
-	//		var m Message
-	//		var u User
-	//		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
-	//		if err != nil {
-	//			return nil, err
-	//		}
-	//		m.User = u
-	//		msgs = append(msgs, m)
-	//	}
-	//}
 	return msgs, nil
 }
 
@@ -225,13 +185,6 @@ func jsonifyMessageWithUser(message Message) map[string]interface{} {
 
 	return r
 }
-
-//func queryMessages(chanID, lastID int64) ([]Message, error) {
-//	msgs := []Message{}
-//	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
-//		lastID, chanID)
-//	return msgs, err
-//}
 
 //request handlers
 func postMessage(c echo.Context) error {
@@ -254,6 +207,11 @@ func postMessage(c echo.Context) error {
 
 	if _, err := addMessage(chanID, user.ID, message); err != nil {
 		return err
+	}
+	// set to cache
+	msg := Message{ChannelID: chanID, UserID: user.ID, Content: message, CreatedAt: time.Now(), User: *user}
+	if err := addMessageToCache(chanID, msg); err != nil {
+		return nil
 	}
 
 	return c.NoContent(204)
