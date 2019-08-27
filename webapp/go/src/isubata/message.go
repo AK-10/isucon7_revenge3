@@ -25,6 +25,27 @@ func makeMessageCountKey(chID int64) string {
 	return messageCountPrefix + strconv.FormatInt(chID, 10)
 }
 
+// ここで渡されるmessagesのidは降順のはず
+func BinarySearchAboutLastId(left, right int, lastID int64, messages []Message) int {
+	if messages[left].ID < lastID || messages[right].ID > lastID {
+		return len(messages)
+	}
+	for left < right {
+		mid := (left + right) / 2
+		if messages[mid].ID == lastID {
+			return mid
+		} else if messages[mid].ID < lastID {
+			left = mid
+		} else {
+			right = mid
+		}
+	}
+	if messages[left].ID == lastID {
+		return left
+	}
+	return len(messages)
+}
+
 func initMessageToCache() error {
 	chIDs := []int64{}
 	err := db.Select(&chIDs, "SELECT id FROM channel")
@@ -150,6 +171,7 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 
 	return res.LastInsertId()
 }
+
 func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
 	r, err := NewRedisful()
 	if err != nil {
@@ -157,16 +179,24 @@ func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, of
 	}
 	defer r.Close()
 
-	var data []byte
 	var msgs []Message
 	key := makeMessageKey(chID)
 	if paginate {
-		data, err = r.GetListFromCacheWithLimitOffset(key, limit, offset)
+		data, err := r.GetListFromCacheWithLimitOffset(key, limit, offset)
+		if err != nil {
+			return nil, err
+		}
+		json.Unmarshal(data, &msgs)
 	} else {
-		// FIXME last_idのこともかんがえる
-		data, err = r.GetListFromCacheWithLimitOffset(key, 100, 0)
+		var messages []Message
+		data, err := r.GetListFromCache(key)
+		if err != nil {
+			return nil, err
+		}
+		json.Unmarshal(data, messages)
+		lastIDIdx := BinarySearchAboutLastId(0, len(messages), lastID, messages)
+		msgs = messages[:lastIDIdx]
 	}
-	json.Unmarshal(data, &msgs)
 	if err != nil {
 		return nil, err
 	}
