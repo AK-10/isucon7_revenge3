@@ -90,7 +90,8 @@ func getHistory(c echo.Context) error {
 	// 	"SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
 	// 	chID, N, (page-1)*N)
 
-	messages, err := queryMessagesWithUser(chID, 0, true, N, (page-1)*N)
+	//messages, err := queryMessagesWithUser(chID, 0, true, N, (page-1)*N)
+	messages, err := queryMessagesWithUserFromCache(chID, 0, true, N, (page-1)*N)
 	if err != nil {
 		return err
 	}
