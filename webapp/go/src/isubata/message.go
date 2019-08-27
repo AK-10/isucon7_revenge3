@@ -157,11 +157,18 @@ func queryMessagesWithUserFromCache(chID, lastID int64, paginate bool, limit, of
 	}
 	defer r.Close()
 
+	var data []byte
 	var msgs []Message
+	key := makeMessageKey(chID)
 	if paginate {
-
+		data, err = r.GetListFromCacheWithLimitOffset(key, limit, offset)
 	} else {
-
+		// FIXME last_idのこともかんがえる
+		data, err = r.GetListFromCacheWithLimitOffset(key, 100, 0)
+	}
+	json.Unmarshal(data, &msgs)
+	if err != nil {
+		return nil, err
 	}
 	return msgs, nil
 }
@@ -278,14 +285,14 @@ func getMessage(c echo.Context) error {
 }
 
 func queryHaveRead(userID, chID int64) (int64, error) {
-	mID, err := getHaveRead(userID, chID)
+	lastID, err := getHaveRead(userID, chID)
 	if err != nil {
 		if err == redis.ErrNil {
 			return 0, nil
 		}
 		return 0, nil
 	}
-	return mID, nil
+	return lastID, nil
 }
 
 func fetchUnread(c echo.Context) error {

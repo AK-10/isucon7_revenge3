@@ -37,10 +37,9 @@ type Renderer struct {
 }
 
 type HaveRead struct {
-	UserID      int64     `db:"user_id"`
-	ChannelID   int64     `db:"channel_id"`
-	MessageID   int64     `db:"message_id"`
-	HaveReadNum int64     `db:"haveread_num"`
-	UpdatedAt   time.Time `db:"updated_at"`
-	CreatedAt   time.Time `db:"created_at"`
+	UserID    int64     `db:"user_id"`
+	ChannelID int64     `db:"channel_id"`
+	MessageID int64     `db:"message_id"`
+	UpdatedAt time.Time `db:"updated_at"`
+	CreatedAt time.Time `db:"created_at"`
 }
