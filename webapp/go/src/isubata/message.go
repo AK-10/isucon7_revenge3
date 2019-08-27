@@ -27,7 +27,7 @@ func makeMessageCountKey(chID int64) string {
 
 // ここで渡されるmessagesのidは降順のはず
 func BinarySearchAboutLastId(left, right int, lastID int64, messages []Message) int {
-	if messages[left].ID < lastID || messages[right].ID > lastID {
+	if messages[left].ID < lastID || messages[right-1].ID > lastID {
 		return len(messages)
 	}
 	for left < right {
