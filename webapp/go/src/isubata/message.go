@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"database/sql"
 	"github.com/gomodule/redigo/redis"
 	"github.com/labstack/echo"
 )
@@ -37,7 +38,7 @@ func initMessageToCache() error {
 			return err
 		}
 		for _, msg := range msgs {
-			if err = setMessageToCache(chID, msg); err != nil {
+			if err = addMessageToCache(chID, msg); err != nil {
 				return err
 			}
 		}
@@ -45,7 +46,7 @@ func initMessageToCache() error {
 	return nil
 }
 
-func setMessageToCache(chID int64, msg Message) error {
+func addMessageToCache(chID int64, msg Message) error {
 	r, err := NewRedisful()
 	if err != nil {
 		return err
@@ -143,47 +144,75 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 
 func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
 	msgs := []Message{}
+	var rows *sql.Rows
+	var err error
 	if paginate {
-		rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
+		rows, err = db.Query("SELECT m.*, u.* FROM message AS m "+
 			"INNER JOIN user AS u ON m.user_id = u.id "+
 			"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
 			chID, limit, offset)
-
-		if err != nil {
-			return nil, err
-		}
-
-		for rows.Next() {
-			var m Message
-			var u User
-			err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
-			if err != nil {
-				return nil, err
-			}
-			m.User = u
-			msgs = append(msgs, m)
-		}
 	} else {
-		rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
+		rows, err = db.Query("SELECT m.*, u.* FROM message AS m "+
 			"INNER JOIN user AS u ON m.user_id = u.id "+
 			"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
 			lastID,
 			chID)
+
+	}
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var m Message
+		var u User
+		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
-
-		for rows.Next() {
-			var m Message
-			var u User
-			err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
-			if err != nil {
-				return nil, err
-			}
-			m.User = u
-			msgs = append(msgs, m)
-		}
+		m.User = u
+		msgs = append(msgs, m)
 	}
+	//if paginate {
+	//	rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
+	//		"INNER JOIN user AS u ON m.user_id = u.id "+
+	//		"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
+	//		chID, limit, offset)
+
+	//	if err != nil {
+	//		return nil, err
+	//	}
+
+	//	for rows.Next() {
+	//		var m Message
+	//		var u User
+	//		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//		m.User = u
+	//		msgs = append(msgs, m)
+	//	}
+	//} else {
+	//	rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
+	//		"INNER JOIN user AS u ON m.user_id = u.id "+
+	//		"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
+	//		lastID,
+	//		chID)
+	//	if err != nil {
+	//		return nil, err
+	//	}
+
+	//	for rows.Next() {
+	//		var m Message
+	//		var u User
+	//		err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+	//		if err != nil {
+	//			return nil, err
+	//		}
+	//		m.User = u
+	//		msgs = append(msgs, m)
+	//	}
+	//}
 	return msgs, nil
 }
 

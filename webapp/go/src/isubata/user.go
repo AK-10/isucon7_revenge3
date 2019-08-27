@@ -39,7 +39,6 @@ func register(name, password string) (int64, error) {
 }
 
 //request handlers
-
 func getRegister(c echo.Context) error {
 	return c.Render(http.StatusOK, "register", map[string]interface{}{
 		"ChannelID": 0,
