@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,10 +12,45 @@ import (
 
 const (
 	messageCountPrefix = "MESSAGE-NUM-CHANNEL-"
+
+	M_STRUCT_KEY = string("M-CH-ID-")
+	M_ID_KEY     = string("M-ID")
 )
 
 func makeMessageCountKey(chID int64) string {
 	return messageCountPrefix + strconv.FormatInt(chID, 10)
+}
+
+func InitMessagesCache() error {
+	rows, err := db.Query("SELECT * FROM message")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	var m Message
+	var key string
+	var lastID int64
+	for rows.Next() {
+		if err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt); err != nil {
+			return err
+		}
+		key = makeMessagesKey(m)
+		r.PushSortedSetToCache(key, int(m.ID), m)
+		lastID = m.ID
+	}
+	key = M_ID_KEY
+	r.SetDataToCache(key, int(lastID))
+	return nil
+}
+
+func makeMessagesKey(m Message) string {
+	return fmt.Sprintf("%s%s", M_STRUCT_KEY, m.ChannelID)
 }
 
 func initMessageCountCache() error {

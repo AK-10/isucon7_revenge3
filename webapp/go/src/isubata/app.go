@@ -79,9 +79,13 @@ func getInitialize(c echo.Context) error {
 	r.FLUSH_ALL()
 	r.Close()
 
-	err = initializeImagesInDB()
+	// err = initializeImagesInDB()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return err
+	// }
+	err = InitMessagesCache()
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	// init messageCount for cache
