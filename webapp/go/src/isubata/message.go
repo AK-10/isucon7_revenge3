@@ -17,6 +17,17 @@ const (
 	M_ID_KEY     = string("M-ID")
 )
 
+// ignore User struct
+func (m Message) toJson() interface{} {
+	r := make(map[string]interface{})
+	r["id"] = m.ID
+	r["channel_id"] = m.ChannelID
+	r["user_id"] = m.UserID
+	r["content"] = m.Content
+	r["created_at"] = m.CreatedAt
+	return m
+}
+
 func makeMessageCountKey(chID int64) string {
 	return messageCountPrefix + strconv.FormatInt(chID, 10)
 }
@@ -41,7 +52,7 @@ func InitMessagesCache() error {
 			return err
 		}
 		key = makeMessagesKey(m)
-		r.PushSortedSetToCache(key, int(m.ID), m)
+		r.PushSortedSetToCache(key, int(m.ID), m.toJson())
 		lastID = m.ID
 	}
 	key = M_ID_KEY
