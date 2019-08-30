@@ -50,7 +50,7 @@ func InitMessagesCache() error {
 }
 
 func makeMessagesKey(m Message) string {
-	return fmt.Sprintf("%s%s", M_STRUCT_KEY, m.ChannelID)
+	return fmt.Sprintf("%s%d", M_STRUCT_KEY, m.ChannelID)
 }
 
 func initMessageCountCache() error {
