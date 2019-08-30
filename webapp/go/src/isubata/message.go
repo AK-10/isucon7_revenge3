@@ -34,7 +34,7 @@ func makeMessageCountKey(chID int64) string {
 }
 
 func InitMessagesCache() error {
-	rows, err := db.Query("SELECT * FROM message")
+	rows, err := db.Query("SELECT m.*, u.name, u.display_name, u.created_at FROM message m inner join user u on u.id = m.id")
 	if err != nil {
 		return err
 	}
@@ -46,14 +46,16 @@ func InitMessagesCache() error {
 	defer r.Close()
 
 	var m Message
+	var u User
 	var key string
 	var lastID int64
 	for rows.Next() {
-		if err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.Name, &u.DisplayName, &u.AvatarIcon); err != nil {
 			return err
 		}
+		m.User = u
 		key = makeMessagesKey(m)
-		r.PushSortedSetToCache(key, int(m.ID), m.toJson())
+		r.PushSortedSetToCache(key, int(m.ID), m)
 		lastID = m.ID
 	}
 	key = M_ID_KEY
@@ -131,7 +133,7 @@ func incrementMessageCount(chID int64) error {
 	return nil
 }
 
-func addMessage(channelID, userID int64, content string) (int64, error) {
+func addMessage(channelID int64, user User, content string) (int64, error) {
 	r, err := NewRedisful()
 	if err != nil {
 		return 0, err
@@ -139,10 +141,10 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	var lastID int64
 	err = r.GetDataFromCache(M_ID_KEY, &lastID)
 	lastID++
-	m := Message{ID: lastID, ChannelID: channelID, UserID: userID, Content: content, CreatedAt: time.Now()}
+	m := Message{ID: lastID, ChannelID: channelID, UserID: user.ID, Content: content, CreatedAt: time.Now(), User: user}
 
 	key := makeMessagesKey(m)
-	ok, err := r.PushSortedSetToCache(key, int(m.ID), m.toJson())
+	ok, err := r.PushSortedSetToCache(key, int(m.ID), m)
 	if err != nil {
 		return 0, err
 	}
@@ -227,10 +229,22 @@ func jsonifyMessageWithUser(message Message) map[string]interface{} {
 	return r
 }
 
-func queryMessages(chanID, lastID int64) ([]Message, error) {
+func queryMessages(chanID, lastID int64, offset, limit int) ([]Message, error) {
 	msgs := []Message{}
-	err := db.Select(&msgs, "SELECT * FROM message WHERE id > ? AND channel_id = ? ORDER BY id DESC LIMIT 100",
-		lastID, chanID)
+	r, err := NewRedisful()
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	var maxMessageID int
+	err = r.GetDataFromCache(M_ID_KEY, &maxMessageID)
+	if err != nil {
+		return nil, err
+	}
+
+	key := makeMessagesKey(Message{ChannelID: chanID})
+	err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), maxMessageID, offset, limit, true, &msgs)
 	return msgs, err
 }
 
@@ -253,7 +267,7 @@ func postMessage(c echo.Context) error {
 		chanID = int64(x)
 	}
 
-	if _, err := addMessage(chanID, user.ID, message); err != nil {
+	if _, err := addMessage(chanID, *user, message); err != nil {
 		return err
 	}
 
