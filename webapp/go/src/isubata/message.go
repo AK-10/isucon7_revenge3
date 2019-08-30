@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -131,18 +132,43 @@ func incrementMessageCount(chID int64) error {
 }
 
 func addMessage(channelID, userID int64, content string) (int64, error) {
-	res, err := db.Exec(
-		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
-		channelID, userID, content)
+	r, err := NewRedisful()
 	if err != nil {
 		return 0, err
 	}
+	var lastID int64
+	err = r.GetDataFromCache(M_ID_KEY, &lastID)
+	m := Message{ID: lastID, ChannelID: channelID, UserID: userID, Content: content, CreatedAt: time.Now()}
+
+	key := makeMessagesKey(m)
+	ok, err := r.PushSortedSetToCache(key, int(m.ID), m.toJson())
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, errors.New("not inserted")
+	}
+	r.IncrementDataInCache(M_ID_KEY)
 	if err = incrementMessageCount(channelID); err != nil {
 		return 0, err
 	}
-
-	return res.LastInsertId()
+	r.Close()
+	return m.ID, nil
 }
+
+// func addMessage(channelID, userID int64, content string) (int64, error) {
+// 	res, err := db.Exec(
+// 		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
+// 		channelID, userID, content)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	if err = incrementMessageCount(channelID); err != nil {
+// 		return 0, err
+// 	}
+//
+// 	return res.LastInsertId()
+// }
 
 func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
 	msgs := []Message{}

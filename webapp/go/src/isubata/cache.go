@@ -453,19 +453,19 @@ func (r *Redisful) GetSortedSetRankRangeFromCache(key string, min, max int, desc
 	return err
 }
 
-func (r *Redisful) PushSortedSetToCache(key string, score int, v interface{}) error {
+func (r *Redisful) PushSortedSetToCache(key string, score int, v interface{}) (bool, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return err
+		return false, err
 	}
-	_, err = r.Conn.Do("ZADD", key, score, data)
+	ok, err := redis.Bool(r.Conn.Do("ZADD", key, score, data))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return false, err
 	}
-	return nil
+	return ok, nil
 }
 
 // マッチするものを1つ削除
