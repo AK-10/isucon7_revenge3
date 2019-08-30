@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -57,12 +56,11 @@ func getHaveRead(uID, chID int64) (int64, error) {
 	}
 	defer r.Close()
 
+	var mID int64
 	field := makeHaveReadField(uID, chID)
-	data, err := r.GetHashFromCache(HAVE_READ_KEY, field)
+	err = r.GetHashFromCache(HAVE_READ_KEY, field, &mID)
 	if err != nil {
 		return 0, err
 	}
-	var mID int64
-	json.Unmarshal(data, &mID)
 	return mID, nil
 }

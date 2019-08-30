@@ -1,8 +1,6 @@
 package main
 
 import (
-	"encoding/json"
-
 	"net/http"
 	"strconv"
 	"time"
@@ -64,12 +62,10 @@ func getMessageCountFromCache(chID int64) (int64, error) {
 
 	key := makeMessageCountKey(chID)
 	var count int64
-	data, err := r.GetDataFromCache(key)
+	err = r.GetDataFromCache(key, &count)
 	if err != nil {
 		return 0, err
 	}
-	json.Unmarshal(data, &count)
-
 	return count, nil
 }
 
