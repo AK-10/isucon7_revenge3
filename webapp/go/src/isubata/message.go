@@ -25,7 +25,7 @@ func (m Message) toJson() interface{} {
 	r["user_id"] = m.UserID
 	r["content"] = m.Content
 	r["created_at"] = m.CreatedAt
-	return m
+	return r
 }
 
 func makeMessageCountKey(chID int64) string {
