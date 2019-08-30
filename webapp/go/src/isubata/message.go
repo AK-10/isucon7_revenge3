@@ -365,7 +365,7 @@ func fetchUnread(c echo.Context) error {
 		key := makeMessagesKey(Message{ChannelID: chID})
 		if lastID > 0 {
 			var msgs []Message
-			err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), maxMessageID, 0, -1, true, &msgs)
+			err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID+1), maxMessageID, 0, -1, true, &msgs)
 			cnt = int64(len(msgs))
 		} else {
 			cnt, err = r.GetSortedSetLengthFromCache(key)
