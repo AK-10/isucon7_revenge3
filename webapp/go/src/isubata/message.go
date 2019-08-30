@@ -14,6 +14,7 @@ import (
 const (
 	messageCountPrefix = "MESSAGE-NUM-CHANNEL-"
 
+	M_KEYS_KEY   = string("M-KEYS-CH-ID-")
 	M_STRUCT_KEY = string("M-CH-ID-")
 	M_ID_KEY     = string("M-ID")
 )
@@ -54,8 +55,10 @@ func InitMessagesCache() error {
 			return err
 		}
 		m.User = u
+		key = makeMessageKeysKey(m)
+		r.PushSortedSetToCache(key, int(m.ID), m.ID)
 		key = makeMessagesKey(m)
-		r.PushSortedSetToCache(key, int(m.ID), m)
+		r.SetNXHashToCache(key, strconv.Itoa(int(m.ID)), m)
 		lastID = m.ID
 	}
 	key = M_ID_KEY
@@ -65,6 +68,10 @@ func InitMessagesCache() error {
 
 func makeMessagesKey(m Message) string {
 	return fmt.Sprintf("%s%d", M_STRUCT_KEY, m.ChannelID)
+}
+
+func makeMessageKeysKey(m Message) string {
+	return fmt.Sprintf("%s%d", M_KEYS_KEY, m.ChannelID)
 }
 
 func initMessageCountCache() error {
@@ -143,8 +150,17 @@ func addMessage(channelID int64, user User, content string) (int64, error) {
 	lastID++
 	m := Message{ID: lastID, ChannelID: channelID, UserID: user.ID, Content: content, CreatedAt: time.Now(), User: user}
 
+	keysKey := makeMessageKeysKey(m)
+	ok, err := r.PushSortedSetToCache(keysKey, int(m.ID), m.ID)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, errors.New("not inserted")
+	}
+
 	key := makeMessagesKey(m)
-	ok, err := r.PushSortedSetToCache(key, int(m.ID), m)
+	ok, err = r.SetNXHashToCache(key, strconv.Itoa(int(m.ID)), m)
 	if err != nil {
 		return 0, err
 	}
