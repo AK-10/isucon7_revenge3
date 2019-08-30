@@ -342,6 +342,19 @@ func fetchUnread(c echo.Context) error {
 
 	resp := []map[string]interface{}{}
 
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
+	defer r.Close()
+
+	var maxMessageID int
+	err = r.GetDataFromCache(M_ID_KEY, &maxMessageID)
+	if err != nil {
+		return err
+	}
+	maxMessageID += 10000
+
 	for _, chID := range channels {
 		lastID, err := queryHaveRead(userID, chID)
 		if err != nil {
@@ -349,18 +362,13 @@ func fetchUnread(c echo.Context) error {
 		}
 
 		var cnt int64
+		key := makeMessagesKey(Message{ChannelID: chID})
 		if lastID > 0 {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
-				chID, lastID)
+			var msgs []Message
+			err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), maxMessageID, 0, -1, true, &msgs)
+			cnt = int64(len(msgs))
 		} else {
-			cnt, err = getMessageCountFromCache(chID)
-			if err != nil {
-				err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
-				if err != nil {
-					return err
-				}
-			}
+			cnt, err = r.GetSortedSetLengthFromCache(key)
 		}
 		r := map[string]interface{}{
 			"channel_id": chID,
