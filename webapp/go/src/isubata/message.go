@@ -289,8 +289,12 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessages(chanID, lastID, 0, -1)
-	// messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
+	var messages []Message
+	if lastID == 0 {
+		messages, err = queryMessages(chanID, lastID, 0, -1)
+	} else {
+		messages, err = queryMessages(chanID, lastID+1, 0, -1)
+	}
 	if err != nil {
 		return err
 	}
