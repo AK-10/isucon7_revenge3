@@ -291,9 +291,9 @@ func getMessage(c echo.Context) error {
 
 	var messages []Message
 	if lastID == 0 {
-		messages, err = queryMessages(chanID, lastID, 0, -1)
+		messages, err = queryMessages(chanID, lastID, 0, 100)
 	} else {
-		messages, err = queryMessages(chanID, lastID+1, 0, -1)
+		messages, err = queryMessages(chanID, lastID+1, 0, 100)
 	}
 	if err != nil {
 		return err
