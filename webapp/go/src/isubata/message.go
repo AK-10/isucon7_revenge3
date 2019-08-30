@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -150,23 +149,12 @@ func addMessage(channelID int64, user User, content string) (int64, error) {
 	lastID++
 	m := Message{ID: lastID, ChannelID: channelID, UserID: user.ID, Content: content, CreatedAt: time.Now(), User: user}
 
-	keysKey := makeMessageKeysKey(m)
-	ok, err := r.PushSortedSetToCache(keysKey, int(m.ID), strconv.Itoa(int(m.ID)))
-	if err != nil {
-		return 0, err
-	}
-	if !ok {
-		return 0, errors.New("not inserted")
-	}
-
-	key := makeMessagesKey(m)
-	ok, err = r.SetNXHashToCache(key, strconv.Itoa(int(m.ID)), m)
-	if err != nil {
-		return 0, err
-	}
-	if !ok {
-		return 0, errors.New("not inserted")
-	}
+	r.Transaction(func() {
+		keysKey := makeMessageKeysKey(m)
+		r.PushSortedSetToCache(keysKey, int(m.ID), strconv.Itoa(int(m.ID)))
+		key := makeMessagesKey(m)
+		r.SetNXHashToCache(key, strconv.Itoa(int(m.ID)), m)
+	})
 	r.IncrementDataInCache(M_ID_KEY)
 	if err = incrementMessageCount(channelID); err != nil {
 		return 0, err
