@@ -386,11 +386,12 @@ func fetchUnread(c echo.Context) error {
 		}
 
 		var cnt int64
-		key := makeMessagesKey(Message{ChannelID: chID})
+		m := Message{ChannelID: chID}
+		key := makeMessageKeysKey(m)
 		if lastID > 0 {
-			var msgs []Message
-			err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID+1), maxMessageID, 0, -1, true, &msgs)
-			cnt = int64(len(msgs))
+			var keys []string
+			r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID+1), maxMessageID, 0, -1, true, &keys)
+			cnt = int64(len(keys))
 		} else {
 			cnt, err = r.GetSortedSetLengthFromCache(key)
 		}
