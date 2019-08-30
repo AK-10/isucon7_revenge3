@@ -287,6 +287,7 @@ func (r *Redisful) GetAllHashFromCache(key string, v interface{}) error {
 func (r *Redisful) GetMultiFromCache(key string, fields []string, v interface{}) error {
 	// conn.Doの引数に合うように変換
 	if len(fields) == 0 {
+		return nil
 		return errors.New("ERR wrong number of arguments for 'hmget' command")
 	}
 	querys := make([]interface{}, 0, len(fields)+1)
