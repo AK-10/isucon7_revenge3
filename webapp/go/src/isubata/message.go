@@ -56,7 +56,7 @@ func InitMessagesCache() error {
 		}
 		m.User = u
 		key = makeMessageKeysKey(m)
-		r.PushSortedSetToCache(key, int(m.ID), m.ID)
+		r.PushSortedSetToCache(key, int(m.ID), strconv.Itoa(int(m.ID)))
 		key = makeMessagesKey(m)
 		r.SetNXHashToCache(key, strconv.Itoa(int(m.ID)), m)
 		lastID = m.ID
@@ -151,7 +151,7 @@ func addMessage(channelID int64, user User, content string) (int64, error) {
 	m := Message{ID: lastID, ChannelID: channelID, UserID: user.ID, Content: content, CreatedAt: time.Now(), User: user}
 
 	keysKey := makeMessageKeysKey(m)
-	ok, err := r.PushSortedSetToCache(keysKey, int(m.ID), m.ID)
+	ok, err := r.PushSortedSetToCache(keysKey, int(m.ID), strconv.Itoa(int(m.ID)))
 	if err != nil {
 		return 0, err
 	}
@@ -259,8 +259,16 @@ func queryMessages(chanID, lastID int64, offset, limit int) ([]Message, error) {
 		return nil, err
 	}
 
-	key := makeMessagesKey(Message{ChannelID: chanID})
-	err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), maxMessageID, offset, limit, true, &msgs)
+	m := Message{ChannelID: chanID}
+	key := makeMessageKeysKey(m)
+	var keys []string
+	err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), maxMessageID, offset, limit, true, &keys)
+	if err != nil {
+		return nil, err
+	}
+
+	key = makeMessagesKey(m)
+	err = r.GetMultiFromCache(key, keys, &msgs)
 	return msgs, err
 }
 
