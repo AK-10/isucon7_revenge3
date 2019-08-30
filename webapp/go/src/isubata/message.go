@@ -34,7 +34,7 @@ func makeMessageCountKey(chID int64) string {
 }
 
 func InitMessagesCache() error {
-	rows, err := db.Query("SELECT m.*, u.name, u.display_name, u.avatar_icon FROM message m inner join user u on u.id = m.id")
+	rows, err := db.Query("SELECT m.*, u.name, u.display_name, u.avatar_icon FROM message m inner join user u on u.id = m.user_id")
 	if err != nil {
 		return err
 	}
