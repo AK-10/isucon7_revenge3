@@ -138,6 +138,7 @@ func addMessage(channelID, userID int64, content string) (int64, error) {
 	}
 	var lastID int64
 	err = r.GetDataFromCache(M_ID_KEY, &lastID)
+	lastID++
 	m := Message{ID: lastID, ChannelID: channelID, UserID: userID, Content: content, CreatedAt: time.Now()}
 
 	key := makeMessagesKey(m)
