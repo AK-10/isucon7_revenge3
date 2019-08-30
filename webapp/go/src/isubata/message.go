@@ -264,7 +264,11 @@ func queryMessages(chanID, lastID int64, offset, limit int) ([]Message, error) {
 	var keys []string
 	err = r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), maxMessageID, offset, limit, true, &keys)
 	if err != nil {
-		return nil, err
+		if err == redis.ErrNil {
+			return msgs, nil
+		} else {
+			return nil, err
+		}
 	}
 
 	key = makeMessagesKey(m)
