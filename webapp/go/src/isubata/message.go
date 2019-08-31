@@ -345,6 +345,7 @@ func fetchUnread(c echo.Context) error {
 	maxMessageID += 10000
 
 	for _, chID := range channels {
+		var lastID int64
 		field := makeHaveReadField(userID, chID)
 		err = r.GetHashFromCache(HAVE_READ_KEY, field, &lastID)
 		if err != nil {
