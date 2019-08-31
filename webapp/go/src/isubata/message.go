@@ -256,6 +256,7 @@ func postMessage(c echo.Context) error {
 	}
 
 	if _, err := addMessage(chanID, *user, message); err != nil {
+		fmt.Println("DEBUG ERROR WHEN ADD MESSAGE: ", err)
 		return err
 	}
 
