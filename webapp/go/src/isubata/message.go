@@ -74,28 +74,6 @@ func makeMessageKeysKey(m Message) string {
 	return fmt.Sprintf("%s%d", M_KEYS_KEY, m.ChannelID)
 }
 
-func initMessageCountCache() error {
-	type MessageCounter struct {
-		ChannelID int64
-		Count     int64
-	}
-	rows, err := db.Query("SELECT channel_id, COUNT(*) FROM message GROUP BY channel_id")
-	if err != nil {
-		return err
-	}
-
-	for rows.Next() {
-		var mc MessageCounter
-		if err = rows.Scan(&mc.ChannelID, &mc.Count); err != nil {
-			return err
-		}
-		if err = setMessageCountToCache(mc.ChannelID, mc.Count); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func setMessageCountToCache(chID, num int64) error {
 	r, err := NewRedisful()
 	if err != nil {
@@ -124,20 +102,6 @@ func getMessageCountFromCache(chID int64) (int64, error) {
 		return 0, err
 	}
 	return count, nil
-}
-
-func incrementMessageCount(chID int64) error {
-	r, err := NewRedisful()
-	if err != nil {
-		return nil
-	}
-	defer r.Close()
-	key := makeMessageCountKey(chID)
-	err = r.IncrementDataInCache(key)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func addMessage(channelID int64, user User, content string) (int64, error) {
@@ -178,7 +142,7 @@ func addMessage(channelID int64, user User, content string) (int64, error) {
 // 	if err != nil {
 // 		return 0, err
 // 	}
-// 	if err = incrementMessageCount(channelID); err != nil {
+// 	if err =
 // 		return 0, err
 // 	}
 //

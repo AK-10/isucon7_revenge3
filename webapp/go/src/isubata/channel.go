@@ -69,13 +69,16 @@ func getHistory(c echo.Context) error {
 	const N = 20
 	var cnt int64
 
-	cnt, err = getMessageCountFromCache(chID)
+	r, err := NewRedisful()
 	if err != nil {
-		err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
-		if err != nil {
-			return err
-		}
+		return err
 	}
+	key := makeMessagesKey(Message{ChannelID: chID})
+	cnt, err = r.GetHashLengthInCache(key)
+	if err != nil {
+		return err
+	}
+	r.Close()
 
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
