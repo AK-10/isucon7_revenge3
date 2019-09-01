@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -36,7 +37,20 @@ SELECT m.*, u.name, u.display_name, u.avatar_icon FROM message m INNER JOIN user
 
 func (r *Redisful) getMessageCount(chID int64) (int64, error) {
 	key := makeMessageKey(chID)
-	return r.GetSortedSetLengthFromCache(key)
+	cnt, err := r.GetSortedSetLengthFromCache(key)
+	if err != nil {
+		return 0, err
+	}
+	if cnt == 0 {
+		exists, err := r.ExistsKeyInCache(key)
+		if err != nil {
+			return 0, err
+		}
+		if !exists {
+			return 0, errors.New("REDIS NOT EXISTS KEY: " + key)
+		}
+	}
+	return cnt, nil
 }
 
 func (r *Redisful) addMessage(m Message) error {

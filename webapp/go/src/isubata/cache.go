@@ -516,3 +516,19 @@ func (r *Redisful) GetSortedSetRankRangeWithLimitFromCache(key string, min, max,
 
 	return err
 }
+
+func (r *Redisful) GetTypeInCache(key string) (string, error) {
+	t, err := redis.String(r.Conn.Do("TYPE", key))
+	if err != nil {
+		return "none", err
+	}
+	return t, nil
+}
+
+func (r *Redisful) ExistsKeyInCache(key string) (bool, error) {
+	ok, err := redis.Bool(r.Conn.Do("EXISTS", key))
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
