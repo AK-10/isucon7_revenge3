@@ -27,11 +27,6 @@ type Redisful struct {
 }
 
 // func main() {
-// 	key := "gg"
-// 	r, _ := NewRedisful()
-// 	fmt.Println(r.ExistsKeyInCache(key))
-// 	key = "bb"
-// 	fmt.Println(r.ExistsKeyInCache(key))
 // }
 
 func NewRedisful() (*Redisful, error) {
@@ -141,8 +136,8 @@ func (r *Redisful) GetListFromCache(key string, v interface{}) error {
 	}
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
-
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 	return err
 }
 
@@ -154,7 +149,8 @@ func (r *Redisful) GetListRangeFromCache(key string, start, end int, v interface
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 	return err
 }
 
@@ -284,7 +280,8 @@ func (r *Redisful) GetAllHashFromCache(key string, v interface{}) error {
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 	return err
 }
 
@@ -312,7 +309,8 @@ func (r *Redisful) GetMultiFromCache(key string, fields []string, v interface{})
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 	return err
 }
 
@@ -363,7 +361,8 @@ func (r *Redisful) GetSetFromCache(key string, v interface{}) error {
 	}
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 	return err
 }
 
@@ -431,7 +430,8 @@ func (r *Redisful) GetSortedSetFromCache(key string, desc bool, v interface{}) e
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 
 	return err
 }
@@ -453,7 +453,8 @@ func (r *Redisful) GetSortedSetRankRangeFromCache(key string, min, max int, desc
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 	return err
 }
 
@@ -516,7 +517,8 @@ func (r *Redisful) GetSortedSetRankRangeWithLimitFromCache(key string, min, max,
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
+	vec := *(*[]byte)(unsafe.Pointer(&str))
+	err = json.Unmarshal(vec, &v)
 
 	return err
 }
