@@ -51,6 +51,9 @@ func (r *Redisful) getHaveRead(uID, chID int64) (int64, error) {
 	field := makeHaveReadField(uID, chID)
 	err := r.GetHashFromCache(HAVE_READ_KEY, field, &mID)
 	if err != nil {
+		if redis.ErrNil == err {
+			return 0, nil
+		}
 		return 0, err
 	}
 	return mID, nil
