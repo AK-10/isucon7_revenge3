@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"unsafe"
 	// "strconv"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 )
 
 const (
-	redisHost = "127.0.0.1"
+	redisHost = "localhost"
 	redisPort = "6379"
 )
 
@@ -26,8 +27,11 @@ type Redisful struct {
 }
 
 // func main() {
+// 	key := "gg"
 // 	r, _ := NewRedisful()
-// 	r.Close()
+// 	fmt.Println(r.ExistsKeyInCache(key))
+// 	key = "bb"
+// 	fmt.Println(r.ExistsKeyInCache(key))
 // }
 
 func NewRedisful() (*Redisful, error) {
@@ -138,7 +142,7 @@ func (r *Redisful) GetListFromCache(key string, v interface{}) error {
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal([]byte(str), &v)
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 	return err
 }
 
@@ -150,7 +154,7 @@ func (r *Redisful) GetListRangeFromCache(key string, start, end int, v interface
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal([]byte(str), &v)
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 	return err
 }
 
@@ -280,13 +284,14 @@ func (r *Redisful) GetAllHashFromCache(key string, v interface{}) error {
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal([]byte(str), &v)
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 	return err
 }
 
 func (r *Redisful) GetMultiFromCache(key string, fields []string, v interface{}) error {
 	// conn.Doの引数に合うように変換
 	if len(fields) == 0 {
+		return nil
 		return errors.New("ERR wrong number of arguments for 'hmget' command")
 	}
 	querys := make([]interface{}, 0, len(fields)+1)
@@ -307,7 +312,7 @@ func (r *Redisful) GetMultiFromCache(key string, fields []string, v interface{})
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal([]byte(str), &v)
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 	return err
 }
 
@@ -358,8 +363,7 @@ func (r *Redisful) GetSetFromCache(key string, v interface{}) error {
 	}
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
-	json.Unmarshal([]byte(str), &v)
-
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 	return err
 }
 
@@ -427,7 +431,7 @@ func (r *Redisful) GetSortedSetFromCache(key string, desc bool, v interface{}) e
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal([]byte(str), &v)
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 
 	return err
 }
@@ -449,23 +453,23 @@ func (r *Redisful) GetSortedSetRankRangeFromCache(key string, min, max int, desc
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal([]byte(str), &v)
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 	return err
 }
 
-func (r *Redisful) PushSortedSetToCache(key string, score int, v interface{}) error {
+func (r *Redisful) PushSortedSetToCache(key string, score int, v interface{}) (bool, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return err
+		return false, err
 	}
-	_, err = r.Conn.Do("ZADD", key, score, data)
+	ok, err := redis.Bool(r.Conn.Do("ZADD", key, score, data))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return false, err
 	}
-	return nil
+	return ok, nil
 }
 
 // マッチするものを1つ削除
@@ -512,7 +516,7 @@ func (r *Redisful) GetSortedSetRankRangeWithLimitFromCache(key string, min, max,
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	err = json.Unmarshal([]byte(str), &v)
+	err = json.Unmarshal(*(*[]byte)(unsafe.Pointer(&str)), &v)
 
 	return err
 }
