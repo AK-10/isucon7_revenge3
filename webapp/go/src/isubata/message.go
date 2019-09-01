@@ -12,6 +12,7 @@ import (
 
 const (
 	messageKey = string("M-CH-ID-")
+	MAX_INT    = int(2147483647)
 )
 
 func (r *Redisful) initMessages() error {
@@ -244,9 +245,17 @@ func fetchUnread(c echo.Context) error {
 
 		var cnt int64
 		if lastID > 0 {
-			err = db.Get(&cnt,
-				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
-				chID, lastID)
+			var msgs []Message
+			key := makeMessageKey(chID)
+			err := r.GetSortedSetRankRangeFromCache(key, int(lastID), MAX_INT, false, &msgs)
+
+			if err != nil {
+				err = db.Get(&cnt,
+					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
+					chID, lastID)
+			} else {
+				cnt = int64(len(msgs))
+			}
 		} else {
 			cnt, err := r.getMessageCount(chID)
 			if err != nil {
