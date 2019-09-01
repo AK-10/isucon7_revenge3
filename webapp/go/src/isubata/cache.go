@@ -494,3 +494,25 @@ func (r *Redisful) GetSortedSetLengthFromCache(key string) (int64, error) {
 	}
 	return count.(int64), nil
 }
+
+func (r *Redisful) GetSortedSetRankRangeWithLimitFromCache(key string, min, max, offset, count int, desc bool, v interface{}) error {
+	var strs []string
+	var err error
+	if desc {
+		strs, err = redis.Strings(r.Conn.Do("ZREVRANGEBYSCORE", key, max, min, "LIMIT", offset, count))
+	} else {
+		strs, err = redis.Strings(r.Conn.Do("ZRANGEBYSCORE", key, min, max, "LIMIT", offset, count))
+	}
+	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
+		return err
+	}
+	str := strings.Join(strs[:], ",")
+	str = "[" + str + "]"
+
+	err = json.Unmarshal([]byte(str), &v)
+
+	return err
+}

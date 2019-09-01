@@ -132,6 +132,59 @@ func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int6
 	return msgs, nil
 }
 
+func (r *Redisful) queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
+	var msgs []Message
+	key := makeMessageKey(chID)
+	if paginate {
+		err := r.GetSortedSetRankRangeWithLimitFromCache(key, 0, MAX_INT, int(offset), int(limit), true, &msgs)
+		if err != nil {
+			rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
+				"INNER JOIN user AS u ON m.user_id = u.id "+
+				"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
+				chID, limit, offset)
+
+			if err != nil {
+				return nil, err
+			}
+
+			for rows.Next() {
+				var m Message
+				var u User
+				err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+				if err != nil {
+					return nil, err
+				}
+				m.User = u
+				msgs = append(msgs, m)
+			}
+		}
+	} else {
+		err := r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), MAX_INT, 0, int(limit), true, &msgs)
+		if err != nil {
+			rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
+				"INNER JOIN user AS u ON m.user_id = u.id "+
+				"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
+				lastID,
+				chID)
+			if err != nil {
+				return nil, err
+			}
+
+			for rows.Next() {
+				var m Message
+				var u User
+				err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
+				if err != nil {
+					return nil, err
+				}
+				m.User = u
+				msgs = append(msgs, m)
+			}
+		}
+	}
+	return msgs, nil
+}
+
 func jsonifyMessageWithUser(message Message) map[string]interface{} {
 	r := make(map[string]interface{})
 	r["id"] = message.ID
