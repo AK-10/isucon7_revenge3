@@ -261,7 +261,7 @@ func getMessage(c echo.Context) error {
 	if err != nil {
 		return nil
 	}
-	messages, err := r.queryMessagesWithUser(chanID, lastID, false, 100, 0)
+	messages, err := r.queryMessagesWithUser(chanID, lastID+1, false, 100, 0)
 	if err != nil {
 		return err
 	}
