@@ -323,7 +323,7 @@ func fetchUnread(c echo.Context) error {
 				cnt = int64(len(msgs))
 			}
 		} else {
-			cnt, err := r.getMessageCount(chID)
+			cnt, err = r.getMessageCount(chID)
 			if err != nil {
 				err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
 				if err != nil {
