@@ -84,8 +84,6 @@ func getHistory(c echo.Context) error {
 		}
 	}
 
-	r.Close()
-
 	maxPage := int64(cnt+N-1) / N
 	if maxPage == 0 {
 		maxPage = 1
@@ -99,10 +97,12 @@ func getHistory(c echo.Context) error {
 	// 	"SELECT * FROM message WHERE channel_id = ? ORDER BY id DESC LIMIT ? OFFSET ?",
 	// 	chID, N, (page-1)*N)
 
-	messages, err := queryMessagesWithUser(chID, 0, true, N, (page-1)*N)
+	messages, err := r.queryMessagesWithUser(chID, 0, true, N, (page-1)*N)
 	if err != nil {
 		return err
 	}
+
+	r.Close()
 
 	mjson := make([]map[string]interface{}, 0)
 	for i := len(messages) - 1; i >= 0; i-- {
