@@ -1,8 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -12,93 +11,78 @@ import (
 )
 
 const (
-	messageCountPrefix = "MESSAGE-NUM-CHANNEL-"
+	messageKey = string("M-CH-ID-")
 )
 
-func makeMessageCountKey(chID int64) string {
-	return messageCountPrefix + strconv.FormatInt(chID, 10)
-}
-
-func initMessageCountCache() error {
-	type MessageCounter struct {
-		ChannelID int64
-		Count     int64
-	}
-	rows, err := db.Query("SELECT channel_id, COUNT(*) FROM message GROUP BY channel_id")
+func (r *Redisful) initMessages() error {
+	rows, err := db.Query(`
+SELECT m.*, u.name, u.display_name, u.avatar_icon FROM message m INNER JOIN user u on u.id = m.user_id
+	`)
 	if err != nil {
 		return err
 	}
+
+	var m Message
 
 	for rows.Next() {
-		var mc MessageCounter
-		if err = rows.Scan(&mc.ChannelID, &mc.Count); err != nil {
+		if err = rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &m.User.Name, &m.User.DisplayName, &m.User.AvatarIcon); err != nil {
 			return err
 		}
-		if err = setMessageCountToCache(mc.ChannelID, mc.Count); err != nil {
-			return err
-		}
+		r.addMessage(m)
 	}
 	return nil
 }
 
-func setMessageCountToCache(chID, num int64) error {
-	r, err := NewRedisful()
-	if err != nil {
-		return err
-	}
-	defer r.Close()
-
-	key := makeMessageCountKey(chID)
-	if err = r.SetDataToCache(key, num); err != nil {
-		return err
-	}
-	return nil
+func (r *Redisful) getMessageCount(chID int64) (int64, error) {
+	key := makeMessageKey(chID)
+	return r.GetSortedSetLengthFromCache(key)
 }
 
-func getMessageCountFromCache(chID int64) (int64, error) {
-	r, err := NewRedisful()
-	if err != nil {
-		return 0, err
-	}
-	defer r.Close()
-
-	key := makeMessageCountKey(chID)
-	var count int64
-	data, err := r.GetDataFromCache(key)
-	if err != nil {
-		return 0, err
-	}
-	json.Unmarshal(data, &count)
-
-	return count, nil
-}
-
-func incrementMessageCount(chID int64) error {
-	r, err := NewRedisful()
-	if err != nil {
-		return nil
-	}
-	defer r.Close()
-	key := makeMessageCountKey(chID)
-	err = r.IncrementDataInCache(key)
+func (r *Redisful) addMessage(m Message) error {
+	key := makeMessageKey(m.ChannelID)
+	err := r.PushSortedSetToCache(key, int(m.ID), m)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func addMessage(channelID, userID int64, content string) (int64, error) {
+func addMessage(channelID int64, user User, content string) (int64, error) {
+	timeNow := time.Now()
 	res, err := db.Exec(
-		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, NOW())",
-		channelID, userID, content)
+		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
+		channelID, user.ID, content, timeNow)
 	if err != nil {
 		return 0, err
 	}
-	if err = incrementMessageCount(channelID); err != nil {
-		return 0, err
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return lastID, err
 	}
+	r, err := NewRedisful()
+	if err != nil {
+		fmt.Println(err)
+		return 0, nil
+	}
+	m := Message{
+		ID:        lastID,
+		ChannelID: channelID,
+		UserID:    user.ID,
+		Content:   content,
+		CreatedAt: timeNow,
+		User:      user,
+	}
+	err = r.addMessage(m)
+	if err != nil {
+		fmt.Println("DEBUG SORTED SET NOT INSERTED: ", err)
+	}
+	r.Close()
 
-	return res.LastInsertId()
+	return lastID, nil
+}
+
+func makeMessageKey(chID int64) string {
+	return fmt.Sprintf("%s%d", messageKey, chID)
 }
 
 func queryMessagesWithUser(chID, lastID int64, paginate bool, limit, offset int64) ([]Message, error) {
@@ -183,7 +167,7 @@ func postMessage(c echo.Context) error {
 		chanID = int64(x)
 	}
 
-	if _, err := addMessage(chanID, user.ID, message); err != nil {
+	if _, err := addMessage(chanID, *user, message); err != nil {
 		return err
 	}
 
@@ -253,6 +237,10 @@ func fetchUnread(c echo.Context) error {
 
 	resp := []map[string]interface{}{}
 
+	r, err := NewRedisful()
+	if err != nil {
+		return err
+	}
 	for _, chID := range channels {
 		lastID, err := queryHaveRead(userID, chID)
 		if err != nil {
@@ -265,7 +253,7 @@ func fetchUnread(c echo.Context) error {
 				"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 				chID, lastID)
 		} else {
-			cnt, err = getMessageCountFromCache(chID)
+			cnt, err := r.getMessageCount(chID)
 			if err != nil {
 				err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
 				if err != nil {
@@ -278,6 +266,7 @@ func fetchUnread(c echo.Context) error {
 			"unread":     cnt}
 		resp = append(resp, r)
 	}
+	r.Close()
 
 	return c.JSON(http.StatusOK, resp)
 }

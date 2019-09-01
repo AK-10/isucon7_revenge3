@@ -77,15 +77,16 @@ func getInitialize(c echo.Context) error {
 	db.MustExec("DELETE FROM haveread")
 	r, err := NewRedisful()
 	r.FLUSH_ALL()
+	err = r.initMessages()
+	if err != nil {
+		fmt.Println("DEBUG INIT MESSAGE ERROR: ", err)
+		return err
+	}
 	r.Close()
 
 	err = initializeImagesInDB()
 	if err != nil {
 		fmt.Println(err)
-		return err
-	}
-	// init messageCount for cache
-	if err := initMessageCountCache(); err != nil {
 		return err
 	}
 	err = initHaveRead()
