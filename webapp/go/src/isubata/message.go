@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/gomodule/redigo/redis"
+	// "github.com/gomodule/redigo/redis"
 	"github.com/labstack/echo"
 )
 
@@ -200,26 +200,21 @@ func getMessage(c echo.Context) error {
 		r := jsonifyMessageWithUser(m)
 		response = append(response, r)
 	}
+	// queryMessagesWithUser の処理次第で前に移動
+	r, err := NewRedisful()
+	if err != nil {
+		return nil
+	}
 
 	if len(messages) > 0 {
-		err = setHaveRead(HaveRead{UserID: userID, ChannelID: chanID, MessageID: messages[0].ID})
+		err = r.setHaveRead(HaveRead{UserID: userID, ChannelID: chanID, MessageID: messages[0].ID})
 		if err != nil {
 			return err
 		}
 	}
+	r.Close()
 
 	return c.JSON(http.StatusOK, response)
-}
-
-func queryHaveRead(userID, chID int64) (int64, error) {
-	mID, err := getHaveRead(userID, chID)
-	if err != nil {
-		if err == redis.ErrNil {
-			return 0, nil
-		}
-		return 0, nil
-	}
-	return mID, nil
 }
 
 func fetchUnread(c echo.Context) error {
@@ -242,7 +237,7 @@ func fetchUnread(c echo.Context) error {
 		return err
 	}
 	for _, chID := range channels {
-		lastID, err := queryHaveRead(userID, chID)
+		lastID, err := r.getHaveRead(userID, chID)
 		if err != nil {
 			return err
 		}

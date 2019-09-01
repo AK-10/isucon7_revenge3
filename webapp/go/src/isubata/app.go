@@ -82,14 +82,14 @@ func getInitialize(c echo.Context) error {
 		fmt.Println("DEBUG INIT MESSAGE ERROR: ", err)
 		return err
 	}
+	err = r.initHaveRead()
+	if err != nil {
+		fmt.Println("DEBUG INIT HAVEREAD ERROR: ", err)
+		return err
+	}
 	r.Close()
 
 	err = initializeImagesInDB()
-	if err != nil {
-		fmt.Println(err)
-		return err
-	}
-	err = initHaveRead()
 	if err != nil {
 		fmt.Println(err)
 		return err
