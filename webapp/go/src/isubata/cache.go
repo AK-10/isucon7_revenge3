@@ -2,11 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
-
 	// "strconv"
-	"errors"
 	"strings"
 
 	"github.com/gomodule/redigo/redis"
@@ -28,10 +27,7 @@ type Redisful struct {
 
 // func main() {
 // 	r, _ := NewRedisful()
-// 	r.Transaction(func() {
-// 		r.SetDataToCache("STRING", "string")
-// 		r.SetDataToCache("STR", "string")
-// 	})
+// 	r.Close()
 // }
 
 func NewRedisful() (*Redisful, error) {
@@ -54,25 +50,35 @@ func (r *Redisful) FLUSH_ALL() error {
 	return nil
 }
 
-func (r *Redisful) Transaction(tx func()) {
-	r.Conn.Do("MULTI")
+func (r *Redisful) Transaction(tx func()) error {
+	_, err := r.Conn.Do("MULTI")
+	if err != nil {
+		return err
+	}
+
 	tx()
-	r.Conn.Do("EXEC")
+
+	_, err = r.Conn.Do("EXEC")
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // =====================
 //		string型
 // =====================
 
-func (r *Redisful) GetDataFromCache(key string) ([]byte, error) {
+func (r *Redisful) GetDataFromCache(key string, v interface{}) error {
 	data, err := redis.Bytes(r.Conn.Do("GET", key))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return nil, err
+		return err
 	}
-	return data, nil
+	err = json.Unmarshal(data, &v)
+	return err
 }
 
 // SETはkeyが存在する場合上書きしてしまう
@@ -92,16 +98,16 @@ func (r *Redisful) SetDataToCache(key string, v interface{}) error {
 }
 
 // SETNXはkeyが存在しない場合のみ挿入
-func (r *Redisful) SetNXDataToCache(key string, v interface{}) error {
+func (r *Redisful) SetNXDataToCache(key string, v interface{}) (bool, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		return err
+		return false, err
 	}
-	_, err = r.Conn.Do("SETNX", key, data)
+	ok, err := redis.Bool(r.Conn.Do("SETNX", key, data))
 	if err != nil {
-		return err
+		return false, err
 	}
-	return nil
+	return ok, nil
 }
 
 func (r *Redisful) IncrementDataInCache(key string) error {
@@ -124,15 +130,28 @@ func (r *Redisful) DecrementDataInCache(key string) error {
 // 			List 型
 // ===========================
 
-func (r *Redisful) GetListFromCache(key string) ([]byte, error) {
+func (r *Redisful) GetListFromCache(key string, v interface{}) error {
 	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, 0, -1))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	return []byte(str), err
+	err = json.Unmarshal([]byte(str), &v)
+	return err
+}
+
+func (r *Redisful) GetListRangeFromCache(key string, start, end int, v interface{}) error {
+	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, start, end))
+	if err != nil {
+		return err
+	}
+	str := strings.Join(strs[:], ",")
+	str = "[" + str + "]"
+
+	err = json.Unmarshal([]byte(str), &v)
+	return err
 }
 
 // RPUSHは最後に追加
@@ -211,15 +230,31 @@ func (r *Redisful) SetHashToCache(key, field string, v interface{}) error {
 	return nil
 }
 
-func (r *Redisful) GetHashFromCache(key, field string) ([]byte, error) {
+func (r *Redisful) SetNXHashToCache(key, field string, v interface{}) (bool, error) {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return false, err
+	}
+	ok, err := redis.Bool(r.Conn.Do("HSET", key, field, data))
+	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
+		return false, err
+	}
+	return ok, nil
+}
+
+func (r *Redisful) GetHashFromCache(key, field string, v interface{}) error {
 	data, err := redis.Bytes(r.Conn.Do("HGET", key, field))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return nil, err
+		return err
 	}
-	return data, nil
+	err = json.Unmarshal(data, &v)
+	return err
 }
 
 func (r *Redisful) RemoveHashFromCache(key, field string) error {
@@ -234,41 +269,56 @@ func (r *Redisful) RemoveHashFromCache(key, field string) error {
 }
 
 // 入力された順
-func (r *Redisful) GetAllHashFromCache(key string) ([]byte, error) {
+func (r *Redisful) GetAllHashFromCache(key string, v interface{}) error {
 	strs, err := redis.Strings(r.Conn.Do("HVALS", key))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return nil, err
+		return err
 	}
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	return []byte(str), err
+	err = json.Unmarshal([]byte(str), &v)
+	return err
 }
 
-func (r *Redisful) GetMultiFromCache(key string, fields []string) ([]byte, error) {
+func (r *Redisful) GetMultiFromCache(key string, fields []string, v interface{}) error {
 	// conn.Doの引数に合うように変換
+	if len(fields) == 0 {
+		return errors.New("ERR wrong number of arguments for 'hmget' command")
+	}
 	querys := make([]interface{}, 0, len(fields)+1)
 	querys = append(querys, key)
 	for i := range fields {
 		querys = append(querys, fields[i])
 	}
 
-	fmt.Println(querys...)
 	strs, err := redis.Strings((r.Conn.Do("HMGET", querys...)))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return nil, err
+		return err
 	}
 
+	strs = ignoreEmptyString(strs)
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	return []byte(str), nil
+	err = json.Unmarshal([]byte(str), &v)
+	return err
+}
+
+func ignoreEmptyString(arr []string) []string {
+	ans := make([]string, 0, len(arr))
+	for _, v := range arr {
+		if v != "" {
+			ans = append(ans, v)
+		}
+	}
+	return ans
 }
 
 // redis.ErrNilを返さない
@@ -284,21 +334,33 @@ func (r *Redisful) GetHashLengthInCache(key string) (int64, error) {
 	return count.(int64), nil
 }
 
+func (r *Redisful) GetHashKeysInCache(key string) ([]string, error) {
+	data, err := redis.Strings(r.Conn.Do("HKEYS", key))
+	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
+		return []string{}, err
+	}
+	return data, nil
+}
+
 // ===================
 //		 Set 型
 // ===================
-func (r *Redisful) GetSetFromCache(key string) ([]byte, error) {
+func (r *Redisful) GetSetFromCache(key string, v interface{}) error {
 	strs, err := redis.Strings(r.Conn.Do("SMEMBERS", key))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return nil, err
+		return err
 	}
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
+	json.Unmarshal([]byte(str), &v)
 
-	return []byte(str), err
+	return err
 }
 
 func (r *Redisful) PushSetToCache(key string, v interface{}) error {
@@ -348,24 +410,47 @@ func (r *Redisful) GetSetLengthFromCache(key string) (int64, error) {
 // =========================
 //		 Sorted Set 型
 // =========================
-func (r *Redisful) GetSortedSetFromCache(key string, desc bool) ([]byte, error) {
+func (r *Redisful) GetSortedSetFromCache(key string, desc bool, v interface{}) error {
 	var strs []string
 	var err error
 	if desc {
-		strs, err = redis.Strings(r.Conn.Do("ZRANGE", key, 0, -1))
-	} else {
 		strs, err = redis.Strings(r.Conn.Do("ZREVRANGE", key, 0, -1))
+	} else {
+		strs, err = redis.Strings(r.Conn.Do("ZRANGE", key, 0, -1))
 	}
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return nil, err
+		return err
 	}
 	str := strings.Join(strs[:], ",")
 	str = "[" + str + "]"
 
-	return []byte(str), err
+	err = json.Unmarshal([]byte(str), &v)
+
+	return err
+}
+
+func (r *Redisful) GetSortedSetRankRangeFromCache(key string, min, max int, desc bool, v interface{}) error {
+	var strs []string
+	var err error
+	if desc {
+		strs, err = redis.Strings(r.Conn.Do("ZREVRANGEBYSCORE", key, max, min))
+	} else {
+		strs, err = redis.Strings(r.Conn.Do("ZRANGEBYSCORE", key, min, max))
+	}
+	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
+		return err
+	}
+	str := strings.Join(strs[:], ",")
+	str = "[" + str + "]"
+
+	err = json.Unmarshal([]byte(str), &v)
+	return err
 }
 
 func (r *Redisful) PushSortedSetToCache(key string, score int, v interface{}) error {
