@@ -55,7 +55,7 @@ func (r *Redisful) getMessageCount(chID int64) (int64, error) {
 
 func (r *Redisful) addMessage(m Message) error {
 	key := makeMessageKey(m.ChannelID)
-	err := r.PushSortedSetToCache(key, int(m.ID), m)
+	_, err := r.PushSortedSetToCache(key, int(m.ID), m)
 	if err != nil {
 		return err
 	}
