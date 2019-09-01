@@ -301,7 +301,6 @@ func fetchUnread(c echo.Context) error {
 			var msgs []Message
 			key := makeMessageKey(chID)
 			err := r.GetSortedSetRankRangeFromCache(key, int(lastID+1), MAX_INT, false, &msgs)
-			+1
 			if err != nil {
 				err = db.Get(&cnt,
 					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
