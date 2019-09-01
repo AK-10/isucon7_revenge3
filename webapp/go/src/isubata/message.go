@@ -257,7 +257,11 @@ func getMessage(c echo.Context) error {
 		return err
 	}
 
-	messages, err := queryMessagesWithUser(chanID, lastID, false, 0, 0)
+	r, err := NewRedisful()
+	if err != nil {
+		return nil
+	}
+	messages, err := r.queryMessagesWithUser(chanID, lastID, false, 0, 0)
 	if err != nil {
 		return err
 	}
@@ -269,10 +273,6 @@ func getMessage(c echo.Context) error {
 		response = append(response, r)
 	}
 	// queryMessagesWithUser の処理次第で前に移動
-	r, err := NewRedisful()
-	if err != nil {
-		return nil
-	}
 
 	if len(messages) > 0 {
 		err = r.setHaveRead(HaveRead{UserID: userID, ChannelID: chanID, MessageID: messages[0].ID})
