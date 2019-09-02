@@ -75,6 +75,7 @@ func addMessage(channelID int64, user User, content string) (int64, error) {
 	if err != nil {
 		return 0, nil
 	}
+	lastID++
 	m := Message{
 		ID:        lastID,
 		ChannelID: channelID,
