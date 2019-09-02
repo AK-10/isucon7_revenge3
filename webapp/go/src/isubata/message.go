@@ -150,7 +150,7 @@ func (r *Redisful) queryMessagesWithUser(chID, lastID int64, paginate bool, limi
 	var msgs []Message
 	key := makeMessageKey(chID)
 	if paginate {
-		err := r.GetSortedSetRankRangeWithLimitFromCache(key, 0, MAX_INT, int(offset), int(limit), true, &msgs)
+		data, err := r.GetSortedSetRankRangeWithLimitFromCache(key, 0, MAX_INT, int(offset), int(limit), true)
 		if err != nil {
 			rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
 				"INNER JOIN user AS u ON m.user_id = u.id "+
@@ -171,9 +171,11 @@ func (r *Redisful) queryMessagesWithUser(chID, lastID int64, paginate bool, limi
 				m.User = u
 				msgs = append(msgs, m)
 			}
+		} else {
+			msgs = unmarshalMessages(data)
 		}
 	} else {
-		err := r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), MAX_INT, 0, int(limit), true, &msgs)
+		data, err := r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), MAX_INT, 0, int(limit), true)
 		if err != nil {
 			rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
 				"INNER JOIN user AS u ON m.user_id = u.id "+
@@ -194,6 +196,8 @@ func (r *Redisful) queryMessagesWithUser(chID, lastID int64, paginate bool, limi
 				m.User = u
 				msgs = append(msgs, m)
 			}
+		} else {
+			msgs = unmarshalMessages(data)
 		}
 	}
 	return msgs, nil
@@ -312,15 +316,14 @@ func fetchUnread(c echo.Context) error {
 
 		var cnt int64
 		if lastID > 0 {
-			var msgs []Message
 			key := makeMessageKey(chID)
-			err := r.GetSortedSetRankRangeFromCache(key, int(lastID+1), MAX_INT, false, &msgs)
+			data, err := r.GetSortedSetRankRangeFromCache(key, int(lastID+1), MAX_INT, false)
 			if err != nil {
 				err = db.Get(&cnt,
 					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
 					chID, lastID)
 			} else {
-				cnt = int64(len(msgs))
+				cnt = int64(len(data))
 			}
 		} else {
 			cnt, err = r.getMessageCount(chID)

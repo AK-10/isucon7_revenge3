@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -85,4 +86,17 @@ func initializeImagesInDB() error {
 		}
 	}
 	return nil
+}
+
+func unmarshalMessages(data [][]byte) []Message {
+	messages := make([]Message, 0, len(data))
+	for i := range data {
+		if data[i] == nil {
+			continue
+		}
+		var m Message
+		json.Unmarshal(data[i], &m)
+		messages = append(messages, m)
+	}
+	return messages
 }
