@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"unsafe"
 	// "strconv"
-	"strings"
 
 	"github.com/gomodule/redigo/redis"
 )
@@ -25,9 +23,6 @@ var (
 type Redisful struct {
 	Conn redis.Conn
 }
-
-// func main() {
-// }
 
 func NewRedisful() (*Redisful, error) {
 	conn, err := redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort))
@@ -129,29 +124,20 @@ func (r *Redisful) DecrementDataInCache(key string) error {
 // 			List 型
 // ===========================
 
-func (r *Redisful) GetListFromCache(key string, v interface{}) error {
-	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, 0, -1))
+func (r *Redisful) GetListFromCache(key string) ([][]byte, error) {
+	data, err := redis.ByteSlices(r.Conn.Do("LRANGE", key, 0, -1))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-	return err
+	return data, err
 }
 
-func (r *Redisful) GetListRangeFromCache(key string, start, end int, v interface{}) error {
-	strs, err := redis.Strings(r.Conn.Do("LRANGE", key, start, end))
+func (r *Redisful) GetListRangeFromCache(key string, start, end int) ([][]byte, error) {
+	data, err := redis.ByteSlices(r.Conn.Do("LRANGE", key, start, end))
 	if err != nil {
-		return err
+		return nil, err
 	}
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-	return err
+	return data, nil
 }
 
 // RPUSHは最後に追加
@@ -269,27 +255,22 @@ func (r *Redisful) RemoveHashFromCache(key, field string) error {
 }
 
 // 入力された順
-func (r *Redisful) GetAllHashFromCache(key string, v interface{}) error {
-	strs, err := redis.Strings(r.Conn.Do("HVALS", key))
+func (r *Redisful) GetAllHashFromCache(key string) ([][]byte, error) {
+	data, err := redis.ByteSlices(r.Conn.Do("HVALS", key))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return nil, err
 	}
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-	return err
+	return data, nil
 }
 
-func (r *Redisful) GetMultiFromCache(key string, fields []string, v interface{}) error {
+func (r *Redisful) GetMultiHashFromCache(key string, fields []string) ([][]byte, error) {
 	// conn.Doの引数に合うように変換
 	if len(fields) == 0 {
-		return nil
-		return errors.New("ERR wrong number of arguments for 'hmget' command")
+		return nil, nil
+		// return errors.New("ERR wrong number of arguments for 'hmget' command")
 	}
 	querys := make([]interface{}, 0, len(fields)+1)
 	querys = append(querys, key)
@@ -297,21 +278,14 @@ func (r *Redisful) GetMultiFromCache(key string, fields []string, v interface{})
 		querys = append(querys, fields[i])
 	}
 
-	strs, err := redis.Strings((r.Conn.Do("HMGET", querys...)))
+	data, err := redis.ByteSlices((r.Conn.Do("HMGET", querys...)))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return nil, err
 	}
-
-	strs = ignoreEmptyString(strs)
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-	return err
+	return data, nil
 }
 
 func ignoreEmptyString(arr []string) []string {
@@ -351,19 +325,15 @@ func (r *Redisful) GetHashKeysInCache(key string) ([]string, error) {
 // ===================
 //		 Set 型
 // ===================
-func (r *Redisful) GetSetFromCache(key string, v interface{}) error {
-	strs, err := redis.Strings(r.Conn.Do("SMEMBERS", key))
+func (r *Redisful) GetSetFromCache(key string) ([][]byte, error) {
+	data, err := redis.ByteSlices(r.Conn.Do("SMEMBERS", key))
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return nil, err
 	}
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-	return err
+	return data, nil
 }
 
 func (r *Redisful) PushSetToCache(key string, v interface{}) error {
@@ -413,49 +383,38 @@ func (r *Redisful) GetSetLengthFromCache(key string) (int64, error) {
 // =========================
 //		 Sorted Set 型
 // =========================
-func (r *Redisful) GetSortedSetFromCache(key string, desc bool, v interface{}) error {
-	var strs []string
+func (r *Redisful) GetSortedSetFromCache(key string, desc bool) ([][]byte, error) {
+	var data [][]byte
 	var err error
 	if desc {
-		strs, err = redis.Strings(r.Conn.Do("ZREVRANGE", key, 0, -1))
+		data, err = redis.ByteSlices(r.Conn.Do("ZREVRANGE", key, 0, -1))
 	} else {
-		strs, err = redis.Strings(r.Conn.Do("ZRANGE", key, 0, -1))
+		data, err = redis.ByteSlices(r.Conn.Do("ZRANGE", key, 0, -1))
 	}
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return nil, err
 	}
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-
-	return err
+	return data, nil
 }
 
-func (r *Redisful) GetSortedSetRankRangeFromCache(key string, min, max int, desc bool, v interface{}) error {
-	var strs []string
+func (r *Redisful) GetSortedSetRankRangeFromCache(key string, min, max int, desc bool) ([][]byte, error) {
+	var data [][]byte
 	var err error
 	if desc {
-		strs, err = redis.Strings(r.Conn.Do("ZREVRANGEBYSCORE", key, max, min))
+		data, err = redis.ByteSlices(r.Conn.Do("ZREVRANGEBYSCORE", key, max, min))
 	} else {
-		strs, err = redis.Strings(r.Conn.Do("ZRANGEBYSCORE", key, min, max))
+		data, err = redis.ByteSlices(r.Conn.Do("ZRANGEBYSCORE", key, min, max))
 	}
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return nil, err
 	}
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-	return err
+	return data, nil
 }
 
 func (r *Redisful) PushSortedSetToCache(key string, score int, v interface{}) (bool, error) {
@@ -500,27 +459,21 @@ func (r *Redisful) GetSortedSetLengthFromCache(key string) (int64, error) {
 	return count.(int64), nil
 }
 
-func (r *Redisful) GetSortedSetRankRangeWithLimitFromCache(key string, min, max, offset, count int, desc bool, v interface{}) error {
-	var strs []string
+func (r *Redisful) GetSortedSetRankRangeWithLimitFromCache(key string, min, max, offset, count int, desc bool) ([][]byte, error) {
+	var data [][]byte
 	var err error
 	if desc {
-		strs, err = redis.Strings(r.Conn.Do("ZREVRANGEBYSCORE", key, max, min, "LIMIT", offset, count))
+		data, err = redis.ByteSlices(r.Conn.Do("ZREVRANGEBYSCORE", key, max, min, "LIMIT", offset, count))
 	} else {
-		strs, err = redis.Strings(r.Conn.Do("ZRANGEBYSCORE", key, min, max, "LIMIT", offset, count))
+		data, err = redis.ByteSlices(r.Conn.Do("ZRANGEBYSCORE", key, min, max, "LIMIT", offset, count))
 	}
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
 			log.Fatal(err)
 		}
-		return err
+		return nil, err
 	}
-	str := strings.Join(strs[:], ",")
-	str = "[" + str + "]"
-
-	vec := *(*[]byte)(unsafe.Pointer(&str))
-	err = json.Unmarshal(vec, &v)
-
-	return err
+	return data, nil
 }
 
 func (r *Redisful) GetTypeInCache(key string) (string, error) {
