@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -49,7 +48,7 @@ func (r *Redisful) getMessageCount(chID int64) (int64, error) {
 			return 0, err
 		}
 		if !exists {
-			return 0, errors.New("REDIS NOT EXISTS KEY: " + key)
+			return 0, nil
 		}
 	}
 	return cnt, nil
