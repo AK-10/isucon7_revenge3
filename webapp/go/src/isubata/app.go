@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"time"
 
@@ -143,6 +144,13 @@ func main() {
 
 	e.GET("add_channel", getAddChannel)
 	e.POST("add_channel", postAddChannel)
+
+	pprofGroup := e.Group("/debug/pprof")
+	pprofGroup.Any("/cmdline", echo.WrapHandler(http.HandlerFunc(pprof.Cmdline)))
+	pprofGroup.Any("/profile", echo.WrapHandler(http.HandlerFunc(pprof.Profile)))
+	pprofGroup.Any("/symbol", echo.WrapHandler(http.HandlerFunc(pprof.Symbol)))
+	pprofGroup.Any("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
+	pprofGroup.Any("/*", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
 
 	e.Start(":5000")
 }
