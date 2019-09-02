@@ -71,14 +71,9 @@ func getHistory(c echo.Context) error {
 
 	r, err := NewRedisful()
 	if err != nil {
-		err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
-		if err != nil {
-			return err
-		}
+		return err
 	} else {
 		cnt, err = r.getMessageCount(chID)
-
-		err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
 		if err != nil {
 			return err
 		}

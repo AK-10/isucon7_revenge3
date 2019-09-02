@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	messageKey = string("M-CH-ID-")
-	MAX_INT    = int(2147483647)
+	messageKey          = string("M-CH-ID-")
+	MAX_INT             = int(2147483647)
+	LAST_MESSAGE_ID_KEY = string("M-LAST-ID")
 )
 
 func (r *Redisful) initMessages() error {
@@ -32,6 +33,7 @@ SELECT m.*, u.name, u.display_name, u.avatar_icon FROM message m INNER JOIN user
 		}
 		r.addMessage(m)
 	}
+	r.SetDataToCache(LAST_MESSAGE_ID_KEY, m.ID)
 	return nil
 }
 
@@ -64,19 +66,13 @@ func (r *Redisful) addMessage(m Message) error {
 
 func addMessage(channelID int64, user User, content string) (int64, error) {
 	timeNow := time.Now()
-	res, err := db.Exec(
-		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
-		channelID, user.ID, content, timeNow)
+	r, err := NewRedisful()
 	if err != nil {
 		return 0, err
 	}
-	lastID, err := res.LastInsertId()
+	var lastID int64
+	err = r.GetDataFromCache(LAST_MESSAGE_ID_KEY, &lastID)
 	if err != nil {
-		return lastID, err
-	}
-	r, err := NewRedisful()
-	if err != nil {
-		fmt.Println(err)
 		return 0, nil
 	}
 	m := Message{
@@ -91,10 +87,45 @@ func addMessage(channelID int64, user User, content string) (int64, error) {
 	if err != nil {
 		fmt.Println("DEBUG SORTED SET NOT INSERTED: ", err)
 	}
+	r.IncrementDataInCache(LAST_MESSAGE_ID_KEY)
 	r.Close()
 
 	return lastID, nil
 }
+
+// func addMessage(channelID int64, user User, content string) (int64, error) {
+// 	timeNow := time.Now()
+// 	res, err := db.Exec(
+// 		"INSERT INTO message (channel_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
+// 		channelID, user.ID, content, timeNow)
+// 	if err != nil {
+// 		return 0, err
+// 	}
+// 	lastID, err := res.LastInsertId()
+// 	if err != nil {
+// 		return lastID, err
+// 	}
+// 	r, err := NewRedisful()
+// 	if err != nil {
+// 		fmt.Println(err)
+// 		return 0, nil
+// 	}
+// 	m := Message{
+// 		ID:        lastID,
+// 		ChannelID: channelID,
+// 		UserID:    user.ID,
+// 		Content:   content,
+// 		CreatedAt: timeNow,
+// 		User:      user,
+// 	}
+// 	err = r.addMessage(m)
+// 	if err != nil {
+// 		fmt.Println("DEBUG SORTED SET NOT INSERTED: ", err)
+// 	}
+// 	r.Close()
+//
+// 	return lastID, nil
+// }
 
 func makeMessageKey(chID int64) string {
 	return fmt.Sprintf("%s%d", messageKey, chID)
@@ -152,53 +183,15 @@ func (r *Redisful) queryMessagesWithUser(chID, lastID int64, paginate bool, limi
 	if paginate {
 		data, err := r.GetSortedSetRankRangeWithLimitFromCache(key, 0, MAX_INT, int(offset), int(limit), true)
 		if err != nil {
-			rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
-				"INNER JOIN user AS u ON m.user_id = u.id "+
-				"WHERE m.channel_id = ? ORDER BY m.id DESC LIMIT ? OFFSET ?",
-				chID, limit, offset)
-
-			if err != nil {
-				return nil, err
-			}
-
-			for rows.Next() {
-				var m Message
-				var u User
-				err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
-				if err != nil {
-					return nil, err
-				}
-				m.User = u
-				msgs = append(msgs, m)
-			}
-		} else {
-			msgs = unmarshalMessages(data)
+			return msgs, err
 		}
+		msgs = unmarshalMessages(data)
 	} else {
 		data, err := r.GetSortedSetRankRangeWithLimitFromCache(key, int(lastID), MAX_INT, 0, int(limit), true)
 		if err != nil {
-			rows, err := db.Query("SELECT m.*, u.* FROM message AS m "+
-				"INNER JOIN user AS u ON m.user_id = u.id "+
-				"WHERE m.id > ? AND m.channel_id = ? ORDER BY m.id DESC LIMIT 100",
-				lastID,
-				chID)
-			if err != nil {
-				return nil, err
-			}
-
-			for rows.Next() {
-				var m Message
-				var u User
-				err := rows.Scan(&m.ID, &m.ChannelID, &m.UserID, &m.Content, &m.CreatedAt, &u.ID, &u.Name, &u.Salt, &u.Password, &u.DisplayName, &u.AvatarIcon, &u.CreatedAt)
-				if err != nil {
-					return nil, err
-				}
-				m.User = u
-				msgs = append(msgs, m)
-			}
-		} else {
-			msgs = unmarshalMessages(data)
+			return msgs, err
 		}
+		msgs = unmarshalMessages(data)
 	}
 	return msgs, nil
 }
@@ -319,19 +312,14 @@ func fetchUnread(c echo.Context) error {
 			key := makeMessageKey(chID)
 			data, err := r.GetSortedSetRankRangeFromCache(key, int(lastID+1), MAX_INT, false)
 			if err != nil {
-				err = db.Get(&cnt,
-					"SELECT COUNT(*) as cnt FROM message WHERE channel_id = ? AND ? < id",
-					chID, lastID)
+				return err
 			} else {
 				cnt = int64(len(data))
 			}
 		} else {
 			cnt, err = r.getMessageCount(chID)
 			if err != nil {
-				err = db.Get(&cnt, "SELECT COUNT(*) as cnt FROM message WHERE channel_id = ?", chID)
-				if err != nil {
-					return err
-				}
+				return err
 			}
 		}
 		r := map[string]interface{}{
