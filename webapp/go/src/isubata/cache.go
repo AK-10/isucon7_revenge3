@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 	// "strconv"
 
 	"github.com/gomodule/redigo/redis"
@@ -18,18 +19,29 @@ const (
 var (
 	// 取得しようとしてるキーに対して、オペレーションが違うときのエラー
 	WrongTypeError = errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	redisPool      *redis.Pool
 )
 
 type Redisful struct {
 	Conn redis.Conn
 }
 
-func NewRedisful() (*Redisful, error) {
-	conn, err := redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort))
-	if err != nil {
-		log.Println(err)
-		return nil, err
+func newPool() *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		MaxActive:   0,
+		IdleTimeout: 240 * time.Second,
+		Wait:        true,
+		Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort)) },
 	}
+}
+
+func NewRedisful() (*Redisful, error) {
+	// conn, err := redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort))
+	conn := redisPool.Get()
+	// if err != nil {
+	// 	return nil, err
+	// }
 	return &Redisful{
 		Conn: conn,
 	}, nil

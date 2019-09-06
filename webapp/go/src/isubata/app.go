@@ -152,5 +152,7 @@ func main() {
 	pprofGroup.Any("/trace", echo.WrapHandler(http.HandlerFunc(pprof.Trace)))
 	pprofGroup.Any("/*", echo.WrapHandler(http.HandlerFunc(pprof.Index)))
 
+	redisPool = newPool()
+
 	e.Start(":5000")
 }
