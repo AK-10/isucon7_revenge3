@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
-	"os/exec"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -73,8 +72,6 @@ func init() {
 			break
 		}
 		fmt.Println("redis: connection failed")
-		// お試し
-		exec.Command("systemctl", "start", "redis")
 		time.Sleep(time.Second * 3)
 	}
 
