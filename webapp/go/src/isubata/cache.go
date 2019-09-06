@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"time"
+
 	// "strconv"
 	"errors"
 	"strings"
@@ -19,6 +21,14 @@ const (
 var (
 	// 取得しようとしてるキーに対して、オペレーションが違うときのエラー
 	WrongTypeError = errors.New("WRONGTYPE Operation against a key holding the wrong kind of value")
+	RedisPool      = &redis.Pool{
+		MaxIdle:     3,
+		MaxActive:   0,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			return redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort))
+		},
+	}
 )
 
 type Redisful struct {
@@ -33,19 +43,20 @@ type Redisful struct {
 // 	})
 // }
 
-func NewRedisful() (*Redisful, error) {
-	conn, err := redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort))
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
+func NewRedisful() *Redisful {
+	conn := RedisPool.Get()
 	return &Redisful{
 		Conn: conn,
-	}, nil
+	}
 }
 
 func (r *Redisful) Close() error {
 	return r.Conn.Close()
+}
+
+func (r *Redisful) Ping() error {
+	_, err := r.Conn.Do("PING")
+	return err
 }
 
 func (r *Redisful) FLUSH_ALL() error {

@@ -63,6 +63,18 @@ func init() {
 		time.Sleep(time.Second * 3)
 	}
 
+	var r *Redisful
+	for {
+		r = NewRedisful()
+		err := r.Ping()
+		if err == nil {
+			log.Println("redis: connection established!")
+			break
+		}
+		log.Println("redis: connection failed")
+		time.Sleep(time.Second * 3)
+	}
+
 	db.SetMaxOpenConns(20)
 	db.SetConnMaxLifetime(5 * time.Minute)
 	log.Printf("Succeeded to connect db.")
