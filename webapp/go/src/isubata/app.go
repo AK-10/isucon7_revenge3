@@ -68,10 +68,10 @@ func init() {
 		r = NewRedisful()
 		err := r.Ping()
 		if err == nil {
-			log.Println("redis: connection established!")
+			fmt.Println("redis: connection established!")
 			break
 		}
-		log.Println("redis: connection failed")
+		fmt.Println("redis: connection failed")
 		time.Sleep(time.Second * 3)
 	}
 
