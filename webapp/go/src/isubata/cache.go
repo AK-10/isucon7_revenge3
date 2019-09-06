@@ -24,6 +24,8 @@ type Redisful struct {
 	Conn redis.Conn
 }
 
+// アプリケーション立ち上げる時に呼ぶやつ
+// redisPool := newPool()
 func newPool() *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     180,
@@ -34,16 +36,27 @@ func newPool() *redis.Pool {
 	}
 }
 
+// すぐシフトチェンジできるように、errorを返すようにしているが、エラーハンドリングは必要ない
+// r, _ := NewRedisful()
+// defer r.Close()
 func NewRedisful() (*Redisful, error) {
-	// conn, err := redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort))
 	conn := redisPool.Get()
-	// if err != nil {
-	// 	return nil, err
-	// }
 	return &Redisful{
 		Conn: conn,
 	}, nil
 }
+
+// コネクションプールを使用しないパターン
+// func NewRedisful() (*Redisful, error) {
+// 	conn, err := redis.Dial(redisProtocol, redisAccessPoint)
+// 	if err != nil {
+// 		log.Println(err)
+// 		return nil, err
+// 	}
+// 	return &Redisful{
+// 		Conn: conn,
+// 	}, nil
+// }
 
 func (r *Redisful) Close() error {
 	return r.Conn.Close()
@@ -117,6 +130,9 @@ func (r *Redisful) SetNXDataToCache(key string, v interface{}) (bool, error) {
 func (r *Redisful) IncrementDataInCache(key string) error {
 	_, err := r.Conn.Do("INCR", key)
 	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
 		return err
 	}
 	return nil
@@ -125,6 +141,9 @@ func (r *Redisful) IncrementDataInCache(key string) error {
 func (r *Redisful) DecrementDataInCache(key string) error {
 	_, err := r.Conn.Do("DECR", key)
 	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
 		return err
 	}
 	return nil
@@ -211,7 +230,7 @@ func (r *Redisful) GetListLengthInCache(key string) (int64, error) {
 // =============================
 // 			ハッシュ型
 // =============================
-func (r *Redisful) SetHashToCache(key, field string, v interface{}) error {
+func (r *Redisful) SetHashToCache(key string, field, v interface{}) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return err
@@ -226,7 +245,7 @@ func (r *Redisful) SetHashToCache(key, field string, v interface{}) error {
 	return nil
 }
 
-func (r *Redisful) SetNXHashToCache(key, field string, v interface{}) (bool, error) {
+func (r *Redisful) SetNXHashToCache(key string, field, v interface{}) (bool, error) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return false, err
@@ -253,7 +272,7 @@ func (r *Redisful) GetHashFromCache(key, field string, v interface{}) error {
 	return err
 }
 
-func (r *Redisful) RemoveHashFromCache(key, field string) error {
+func (r *Redisful) RemoveHashFromCache(key string, field interface{}) error {
 	_, err := r.Conn.Do("HDEL", key, field)
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
@@ -296,16 +315,6 @@ func (r *Redisful) GetMultiHashFromCache(key string, fields []string) ([][]byte,
 		return nil, err
 	}
 	return data, nil
-}
-
-func ignoreEmptyString(arr []string) []string {
-	ans := make([]string, 0, len(arr))
-	for _, v := range arr {
-		if v != "" {
-			ans = append(ans, v)
-		}
-	}
-	return ans
 }
 
 // redis.ErrNilを返さない
@@ -393,13 +402,30 @@ func (r *Redisful) GetSetLengthFromCache(key string) (int64, error) {
 // =========================
 //		 Sorted Set 型
 // =========================
-func (r *Redisful) GetSortedSetFromCache(key string, desc bool) ([][]byte, error) {
+func (r *Redisful) GetSortedSetListFromCache(key string, desc bool) ([][]byte, error) {
 	var data [][]byte
 	var err error
 	if desc {
 		data, err = redis.ByteSlices(r.Conn.Do("ZREVRANGE", key, 0, -1))
 	} else {
 		data, err = redis.ByteSlices(r.Conn.Do("ZRANGE", key, 0, -1))
+	}
+	if err != nil {
+		if err.Error() == WrongTypeError.Error() {
+			log.Fatal(err)
+		}
+		return nil, err
+	}
+	return data, nil
+}
+
+func (r *Redisful) GetSortedSetListRangeFromCache(key string, min, max int, desc bool) ([][]byte, error) {
+	var data [][]byte
+	var err error
+	if desc {
+		data, err = redis.ByteSlices(r.Conn.Do("ZREVRANGE", key, min, max))
+	} else {
+		data, err = redis.ByteSlices(r.Conn.Do("ZRANGE", key, max, min))
 	}
 	if err != nil {
 		if err.Error() == WrongTypeError.Error() {
