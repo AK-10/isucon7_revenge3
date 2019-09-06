@@ -3,17 +3,15 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"time"
-	// "strconv"
 
 	"github.com/gomodule/redigo/redis"
 )
 
 const (
-	redisHost = "localhost"
-	redisPort = "6379"
+	redisProtocol    = string("tcp")
+	redisAccessPoint = string("localhost:6379")
 )
 
 var (
@@ -28,11 +26,11 @@ type Redisful struct {
 
 func newPool() *redis.Pool {
 	return &redis.Pool{
-		MaxIdle:     3,
+		MaxIdle:     180,
 		MaxActive:   0,
-		IdleTimeout: 240 * time.Second,
-		Wait:        true,
-		Dial:        func() (redis.Conn, error) { return redis.Dial("tcp", fmt.Sprintf("%s:%s", redisHost, redisPort)) },
+		IdleTimeout: 30 * time.Second,
+		Wait:        false,
+		Dial:        func() (redis.Conn, error) { return redis.Dial(redisProtocol, redisAccessPoint) },
 	}
 }
 
