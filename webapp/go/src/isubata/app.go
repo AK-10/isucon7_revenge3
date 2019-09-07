@@ -59,6 +59,7 @@ func init() {
 		if err == nil {
 			break
 		}
+		log.Println("mysql: connection refused")
 		log.Println(err)
 		time.Sleep(time.Second * 3)
 	}
